@@ -48,6 +48,7 @@ HOURLY_CSV = DATA / "hourly_summary.csv"
 HOUR_STATE = DATA / ".current_hour.json"
 CROPS = DATA / "crops"
 REVIEW = DATA / "review" / "pending"
+CAMERA_MODEL = MODELS / "camera_classifier.npz"
 
 POLL_SECONDS = 2
 STALE_SECONDS = 60          # a frame older than this means the wallpaper isn't streaming
@@ -70,6 +71,7 @@ BOX_MIN_MOTION = 0.10       # a detection needs this share of its area to have m
 BLOB_MIN_PX = 90            # moving areas smaller than this are small fish, not a new kind of animal
 MAX_BLOBS = 4               # biggest moving areas checked per frame
 SCENE_MIN_MOTION = 0.15     # the whole frame is checked for a big animal when this much of it moved
+CAMERA_MIN_PROB = 0.70      # the camera-trained classifier's answer is used when it's at least this sure
 REVIEW_FISH_PROB = 0.25     # an unidentified (big enough) fish whose best guess is at least this goes to review
 REVIEW_SCENE_PROB = 0.40    # a non-fish/big-animal guess between this and SCENE_MIN_PROB goes to review
 REVIEW_EVERY = timedelta(minutes=10)  # at most one "not sure" picture per best guess per 10 min...
@@ -86,7 +88,8 @@ CROP_EVERY = timedelta(minutes=10)  # keep one sample crop per animal type per 1
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], np.float32)
 
-SIGHTING_FIELDS = ["timestamp", "date", "time", "common_name", "scientific_name", "category", "count", "confidence"]
+SIGHTING_FIELDS = ["timestamp", "date", "time", "common_name", "scientific_name", "category", "count", "confidence",
+                   "method"]
 HOURLY_FIELDS = ["date", "hour", "snapshots_analyzed", "snapshots_dark", "common_name", "snapshots_seen", "max_count"]
 UNIDENTIFIED = {"common": "fish (unidentified)", "scientific": "", "category": "fish"}
 SMALL_FISH = {"common": "small fish", "scientific": "", "category": "fish"}
@@ -101,6 +104,7 @@ class Sighting:
     category: str
     count: int
     confidence: float
+    method: str = "zero-shot"  # zero-shot | camera-trained | detector only
 
 
 class Models:
@@ -131,10 +135,21 @@ class Models:
         self.logit_scale = meta["logit_scale"]
         self.labels = meta["labels"]
         self.label_emb = np.load(MODELS / "label_embeddings.npy")
+        self.embedding_model = meta.get("model", "hf-hub:imageomics/bioclip-2")
+        self.camera, self.camera_mtime = None, None
         # The fish detector only finds fish, so its boxes are only ever given fish names (or a
         # "not an animal" label): a blurry fish can't come out as an octopus or a jellyfish.
         self.fish_idx = np.array([i for i, l in enumerate(self.labels)
                                   if l["negative"] or l["category"] in ("fish", "shark/ray")])
+        # Look-alike groups from species.json ("silversides & sardines", "jellyfish"...).
+        spec = json.loads((ROOT / "species.json").read_text(encoding="utf-8"))
+        self.group_of = {sp["common"]: sp["group"] for sp in spec["species"] if sp.get("group")}
+        members = defaultdict(list)
+        for sp in spec["species"]:
+            if sp.get("group"):
+                members[sp["group"]].append(sp)
+        self.groups = {g: {"common": g, "scientific": "", "category": ms[0]["category"], "negative": False,
+                           "scene": any(m.get("scene") for m in ms), "group": True} for g, ms in members.items()}
         log.info("models ready on %s (%d labels)", self.device, len(self.labels))
 
     def detect(self, img: Image.Image):
@@ -158,6 +173,52 @@ class Models:
         x = np.asarray(img.convert("RGB").resize(size, Image.BICUBIC, reducing_gap=2.0), np.float32) / 255.0
         x = ((x - self.cls_mean) / self.cls_std).transpose(2, 0, 1)[None]
         return self.classifier(x)[0][0]
+
+    def name(self, probs: np.ndarray, subset, min_prob: float):
+        """(label, probability) for the most likely animal if it reaches min_prob; otherwise for its
+        look-alike group when the model spreads its confidence over the group's members (a smelt it
+        can't split between topsmelt, jacksmelt, anchovy and sardine is still clearly one of them);
+        otherwise (None, best probability). "Not an animal" labels are never returned."""
+        index = np.arange(len(probs)) if subset is None else subset
+        animals = [k for k in range(len(probs)) if not self.labels[index[k]]["negative"]]
+        best = max(animals, key=lambda k: probs[k])
+        if probs[best] >= min_prob:
+            return self.labels[index[best]], float(probs[best])
+        totals = defaultdict(float)
+        for k in animals:
+            group = self.group_of.get(self.labels[index[k]]["common"])
+            if group:
+                totals[group] += float(probs[k])
+        if totals:
+            group, total = max(totals.items(), key=lambda kv: kv[1])
+            if total >= min_prob:
+                return self.groups[group], total
+        return None, float(probs[best])
+
+    def camera_name(self, embedding: np.ndarray):
+        """The camera-trained classifier's answer (ml/train_classifier.py), if one is switched on and
+        it's sure: (label, probability), or ("not an animal", probability). None otherwise."""
+        mtime = CAMERA_MODEL.stat().st_mtime if CAMERA_MODEL.exists() else None
+        if mtime != self.camera_mtime:  # (re)load after nightly retraining
+            self.camera_mtime, self.camera = mtime, None
+            if mtime:
+                model = np.load(CAMERA_MODEL, allow_pickle=False)
+                if bool(model["enabled"]) and str(model["embedding_model"]) == self.embedding_model:
+                    self.camera = model
+                    log.info("camera-trained classifier on (%d animals)", len(model["classes"]))
+        if self.camera is None:
+            return None
+        logits = self.camera["coef"] @ embedding + self.camera["intercept"]
+        p = np.exp(logits - logits.max())
+        p /= p.sum()
+        best = int(p.argmax())
+        if p[best] < CAMERA_MIN_PROB:
+            return None
+        name = str(self.camera["classes"][best])
+        if name == "not an animal":
+            return name, float(p[best])
+        label = self.groups.get(name) or next((l for l in self.labels if l["common"] == name), None)
+        return (label, float(p[best])) if label else None
 
     def probabilities(self, embedding: np.ndarray, subset=None) -> np.ndarray:
         """Softmax over all labels, or over labels[subset] (then index i means labels[subset[i]])."""
@@ -350,7 +411,7 @@ class Tracker:
         if sightings:
             self._append(SIGHTINGS_CSV, SIGHTING_FIELDS, [
                 [when.isoformat(timespec="seconds"), when.date().isoformat(), when.strftime("%H:%M:%S"),
-                 s.common, s.scientific, s.category, s.count, f"{s.confidence:.2f}"] for s in sightings])
+                 s.common, s.scientific, s.category, s.count, f"{s.confidence:.2f}", s.method] for s in sightings])
         log.info("%s: %s (%.2fs)", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing",
                  time.perf_counter() - started)
@@ -358,13 +419,14 @@ class Tracker:
 
     def _identify(self, img: Image.Image, when: datetime):
         m = self.models()
-        found = defaultdict(lambda: [0, 0.0, None])  # common name -> [count, best probability, label]
+        found = defaultdict(lambda: [0, 0.0, None, "zero-shot"])  # name -> [count, best prob, label, method]
 
-        def add(label, prob, count=1):
+        def add(label, prob, count=1, method="zero-shot"):
             entry = found[label["common"]]
             entry[0] += count
             entry[1] = max(entry[1], prob)
             entry[2] = label
+            entry[3] = method
 
         # Fish boxes, keeping only those where something moved: the detector sometimes boxes the
         # pilings or the rope hanging from the pier, and those never move.
@@ -384,27 +446,30 @@ class Tracker:
             view = img if box == full else square_crop(img, box)
             emb = m.embed(view)
             probs = m.probabilities(emb)
-            best = int(probs.argmax())
-            label = m.labels[best]
-            if not label["scene"] or label["negative"]:
+            label, prob = m.name(probs, None, SCENE_MIN_PROB)
+            if label is None:
+                best = int(probs.argmax())
+                top = m.labels[best]
+                if top["scene"] and not top["negative"] and probs[best] >= REVIEW_SCENE_PROB:
+                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
                 continue
-            name, prob = label["common"], float(probs[best])
-            if box != full and SCENE_MIN_PROB <= prob < SCENE_SURE_PROB:
+            if not label["scene"]:
+                continue  # a fish: the detector's job
+            name = label["common"]
+            if box != full and prob < SCENE_SURE_PROB:
                 first = self.scene_first_seen.get(name)
                 if not first or when - first > SCENE_REPEAT:
                     self.scene_first_seen[name] = when  # wait for it to show up again
                     self._queue_review(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
                     continue
-            if prob >= SCENE_MIN_PROB:
-                if name not in found:
-                    self._save_crop(view, when, label["common"], float(probs[best]))
-                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, logged_as=label["common"],
+            if name not in found:
+                self._save_crop(view, when, name, prob)
+                if not label.get("group"):
+                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, logged_as=name,
                                        embedding=emb)
-                    add(label, float(probs[best]))
-                if box == full:
-                    whole_frame_animal = label
-            elif probs[best] >= REVIEW_SCENE_PROB:
-                self._queue_review(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                add(label, prob)
+            if box == full:
+                whole_frame_animal = label
 
         # 2. Fish. Big enough: named from the fish labels only, or logged as unidentified (and maybe
         #    sent to review) when unsure. Too small to tell apart: see 3.
@@ -421,19 +486,23 @@ class Tracker:
             emb = m.embed(crop)
             probs = m.probabilities(emb, m.fish_idx)
             best = int(probs.argmax())
-            label = m.labels[m.fish_idx[best]]
-            if label["negative"] and probs[best] >= NEGATIVE_MIN_PROB:
+            if m.labels[m.fish_idx[best]]["negative"] and probs[best] >= NEGATIVE_MIN_PROB:
                 continue  # murk, kelp or piling, not an animal
-            if label["negative"] or probs[best] < SPECIES_MIN_PROB:
-                guesses = top_guesses(m.labels, probs, m.fish_idx)
+            camera = m.camera_name(emb)
+            if camera and camera[0] == "not an animal":
+                continue  # learned from people's answers: this kind of thing isn't an animal
+            label, prob = camera or m.name(probs, m.fish_idx, SPECIES_MIN_PROB)
+            method = "camera-trained" if camera else "zero-shot"
+            guesses = top_guesses(m.labels, probs, m.fish_idx)
+            if label is None or label.get("group"):
+                # Not sure of the species: a person may be able to tell.
                 if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
                     self._queue_review(crop, img, box[:4], guesses, when, embedding=emb)
-                label, prob = UNIDENTIFIED, float(box[4])  # a fish, but not sure which: don't guess
+                if label is None:
+                    label, prob, method = UNIDENTIFIED, float(box[4]), "detector only"  # not even the group
             else:
-                prob = float(probs[best])
-                self._queue_review(crop, img, box[:4], top_guesses(m.labels, probs, m.fish_idx), when,
-                                   logged_as=label["common"], embedding=emb)
-            add(label, prob)
+                self._queue_review(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb)
+            add(label, prob, method=method)
             self._save_crop(crop, when, label["common"], prob)
 
         # 3. Small fish aren't tracked one by one: a school is one sighting a snapshot, with a rough
@@ -441,11 +510,12 @@ class Tracker:
         #    moving specks, but only once the detector confirms there are fish at all.
         if small_scores:
             size = max(len(small_scores), self.motion.small_movers(MIN_NAME_PX))
-            add(SMALL_FISH, max(small_scores), rough(size) if size >= SCHOOL_MIN else len(small_scores))
+            add(SMALL_FISH, max(small_scores), rough(size) if size >= SCHOOL_MIN else len(small_scores),
+                method="detector only")
 
         # Five or more of one kind in a snapshot is logged as that kind's school.
-        return [Sighting(l["common"] + (" (school)" if n >= SCHOOL_MIN else ""), l["scientific"], l["category"], n, p)
-                for n, p, l in found.values()]
+        return [Sighting(l["common"] + (" (school)" if n >= SCHOOL_MIN else ""), l["scientific"], l["category"], n, p, how)
+                for n, p, l, how in found.values()]
 
     def _queue_review(self, view: Image.Image, frame: Image.Image, box, guesses, when: datetime, logged_as=None,
                       embedding=None):
@@ -478,6 +548,7 @@ class Tracker:
             # BioCLIP's image embedding: with the person's answer, this is a ready-made training
             # example for a classifier fitted to this camera (see "Where this could go" in the README).
             "embedding": [] if embedding is None else [round(float(v), 4) for v in embedding],
+            "embedding_model": self._models.embedding_model if self._models else "",
         }), encoding="utf-8")
         log.info("queued for review (%s): %s (%.0f%%)", kind, name, 100 * guesses[0]["prob"])
 
@@ -526,12 +597,11 @@ class Tracker:
                     for name, (seen, most) in sorted(h["species"].items())]
             self._append(HOURLY_CSV, HOURLY_FIELDS, rows or [[h["date"], h["hour"], h["analyzed"], h["dark"], "", 0, 0]])
         if h["date"] != when.date().isoformat():
-            # New day: fetch the pier's conditions, and publish yesterday's stats to the public README
-            # if enabled (that fetches the conditions too). Idle priority, no waiting.
-            script = "publish_results.py" if self.publish else "environment.py"
-            subprocess.Popen([sys.executable, str(ROOT / script)], cwd=ROOT,
-                             creationflags=0x08000000 | 0x40)  # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS
-            log.info("new day: running %s", script)
+            # New day: the nightly job (conditions, retraining from review answers, the conditions
+            # model, and the public README if enabled). Idle priority, no waiting.
+            args = [sys.executable, str(ROOT / "nightly.py")] + (["--publish"] if self.publish else [])
+            subprocess.Popen(args, cwd=ROOT, creationflags=0x08000000 | 0x40)  # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS
+            log.info("new day: nightly job started")
         self.hour = self._new_hour(when)
         if when - self.last_prune > timedelta(hours=6):
             self.last_prune = when
@@ -553,6 +623,16 @@ class Tracker:
 
     @staticmethod
     def _append(path: Path, fields, rows):
+        if path.exists():
+            with path.open(encoding="utf-8") as f:
+                old_fields = next(csv.reader(f), [])
+            if old_fields != fields:  # written by an older version: add the new columns, blank
+                with path.open(encoding="utf-8") as f:
+                    old = list(csv.DictReader(f))
+                with path.open("w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fields)
+                    writer.writeheader()
+                    writer.writerows({k: r.get(k, "") for k in fields} for r in old)
         new = not path.exists()
         with path.open("a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)

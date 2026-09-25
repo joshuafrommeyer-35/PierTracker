@@ -85,8 +85,15 @@ flowchart LR
      a vision model trained on the Tree of Life that can match an image against species names it has never
      been fine-tuned on (zero-shot). The crop is compared only with the **fish** in
      [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
-     piling...). So a blurry fish can't come out as an octopus. Below 0.60 it's logged as
-     **fish (unidentified)**.
+     piling...). So a blurry fish can't come out as an octopus.
+   - **Look-alike groups.** Many mistakes are between look-alikes: topsmelt vs. jacksmelt vs. anchovy vs.
+     sardine, or opaleye vs. halfmoon. So when no species reaches 0.60 but the model is sure it's one of a
+     group (their probabilities add up to 0.60+), the **group** is logged instead: "silversides &
+     sardines", "surfperches", "sea basses", "grunts (salema, sargo)" and so on (see `species.json`).
+     Otherwise it's **fish (unidentified)**.
+   - Once the **camera-trained classifier** has learned from enough review answers (see
+     [Learning from the data](#learning-from-the-data)), its answer is used first for the animals it
+     knows.
 5. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
    sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
    lot of it moved, are compared against every label (44 animals + 9 "not an animal"). A "scene" animal
@@ -103,7 +110,9 @@ flowchart LR
    ~10 an hour. See [Reviewing uncertain sightings](#reviewing-uncertain-sightings).
 7. **Logging.**
    - `data/sightings.csv` gets one row per animal type per snapshot:
-     `timestamp, date, time, common_name, scientific_name, category, count, confidence`.
+     `timestamp, date, time, common_name, scientific_name, category, count, confidence, method`.
+     `method` is how it was named: `zero-shot` (BioCLIP), `camera-trained`, or `detector only` (small or
+     unidentified fish).
    - `data/hourly_summary.csv` rolls these up per hour, with how many snapshots were analyzed and how
      many were dark.
    - Five or more of one named kind in a snapshot is logged once as **"<kind> (school)"**, for example
@@ -125,6 +134,8 @@ itself, and saves them next to the sightings (`data/environment_hourly.csv`, pub
 |---|---|---|
 | [NOAA tide gauge 9410230 "La Jolla"](https://tidesandcurrents.noaa.gov/stationhome.html?id=9410230) | Predicted tide and observed water level (m above MLLW), rising/falling, water and air temperature, wind, air pressure | Official NOAA data |
 | [SCCOOS Automated Shore Station, Scripps Pier](https://sccoos.org/autoss/) | Water temperature, salinity, dissolved oxygen, pH, turbidity, chlorophyll | Sensors ~5 m deep, next to the camera's ~4 m. Only readings that passed the station's [QARTOD](https://ioos.noaa.gov/project/qartod/) quality tests are kept |
+| Same shore station, daily means since 2013 | **Temperature anomaly**: how much warmer or colder than normal the water is for that date | Normal for each date = 2013–2025 mean, smoothed ±15 days. Late September's normal is ~20 °C; on 2026-09-25 the water was **+2.6 °C** above it |
+| [NOAA Oceanic Niño Index (ONI)](https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt) | The official El Niño / La Niña measure (El Niño at +0.5 or more) | 2026 is an El Niño year: ONI +1.8 for Jun–Aug, and NOAA's El Niño Advisory gives >90% odds of a very strong event this fall and winter |
 
 The sources were checked before use:
 - On the first day, NOAA's water temperature (22.5 °C) and the shore station's (22.46 °C) agreed.
@@ -132,7 +143,8 @@ The sources were checked before use:
 - About 12% of turbidity readings fail quality control, and those are dropped.
 
 Each value is the median of that hour's readings. The hourly sightings (`results/hourly_summary.csv`) and
-hourly conditions join on `date` + `hour`.
+hourly conditions join on `date` + `hour`. Recording through a strong El Niño makes this a good season to
+start: warm-water visitors and missing regulars should both show up against the temperature anomaly.
 
 ### What the numbers mean
 
@@ -240,25 +252,59 @@ when the model hesitates.
 past zero-shot. About 50 per species are enough to train a small classifier on BioCLIP's image embeddings,
 which usually beats zero-shot by a wide margin on a specific camera.
 
-## Where this could go (modeling)
+## Learning from the data
 
-The tracker already runs on two machine-learning models (a detector and BioCLIP 2). Once a few weeks of
-data exist, there's room for more:
+Both pieces are built, tested, and run automatically. They switch themselves on when there's enough data.
+A nightly job (`tracker/nightly.py`, started by the tracker after midnight at idle priority) runs:
 
-1. **A classifier fitted to this camera.** Every review picture saves BioCLIP's image embedding next to
-   the person's answer. About 30–50 answers per species are enough to train a small classifier (logistic
-   regression on the embeddings, seconds on a CPU). That usually beats zero-shot naming by a wide margin on
-   a single camera. The review queue already picks the pictures the model is least sure about, which is a
-   simple form of active learning.
-2. **What drives what shows up.** Model sightings per hour against the pier's conditions: water
-   temperature, turbidity, chlorophyll, tide height and direction, time of day, season.
-   - Count models (Poisson or negative binomial GLMs/GAMs) or gradient-boosted trees would show things like
-     "leopard sharks show up on rising tides in warm water".
-   - An occupancy model can separate "not there" from "there but the water was too murky to see".
-3. **Forecasts.** With enough history: what are the odds of seeing a sea lion or a ray in the next hour,
-   given the tide and conditions now?
-4. **Better counts.** A detector fine-tuned on this camera's small fish (from a few hundred boxed frames)
-   would count schools far better than the current motion-speck estimate.
+1. `environment.py`: fetches the day's conditions.
+2. `ml/train_classifier.py`: retrains the camera classifier from the review answers.
+3. `ml/conditions_model.py`: refits "what brings animals in".
+4. `publish_results.py`: updates this README (if publishing is on).
+
+### Camera-trained classifier (`tracker/ml/train_classifier.py`)
+
+BioCLIP matches pictures against species *names*. It has never seen this camera's green-blue, blurry,
+backlit footage, which is where its overconfidence comes from. Every review picture stores BioCLIP's
+image embedding (768 numbers describing the picture), and your answer is its label.
+
+- **How it trains:** a logistic regression on those embeddings learns what each animal looks like *on
+  this camera*. "Not an animal" answers are a class too, so it also learns to throw away piling edges.
+- **When it switches on:** an animal is learned at **12 answers** (~30 makes it reliable), and it needs
+  at least 3 animals. The classifier is only used if it beats zero-shot BioCLIP by 5+ points in
+  cross-validation on the same pictures.
+- **How it's used:** the tracker picks it up automatically and uses its answer when it's 70%+ sure. Every
+  sighting records which method named it.
+- **Progress:** the review window shows the answer count. The report is at
+  [`results/camera_classifier.md`](results/camera_classifier.md); run
+  `tracker\.venv\Scripts\python tracker\ml\train_classifier.py --status` to check it anytime.
+- **Tested** on synthetic data: it trains, cross-validates, beats the baseline and switches on.
+
+### What brings animals in (`tracker/ml/conditions_model.py`)
+
+For each animal seen in 30+ hours, this fits a negative binomial regression (counts that come in bursts)
+of snapshots per daylight hour, with the hour's daylight snapshots as exposure. The predictors are:
+- how much warmer than normal the water is (the local El Niño signal)
+- turbidity and chlorophyll
+- tide height, and whether it's rising
+- time of day
+- the El Niño index, once the data spans months where it changes
+
+Results are rate ratios per typical (1 SD) change with 95% intervals, in
+[`results/conditions_model.md`](results/conditions_model.md). It starts after **21 days** of data.
+
+- **Tested:** on synthetic data with a planted "1.6× more sightings per SD of warmer water" effect, it
+  recovered 1.71× (95% CI 1.56–1.87) and correctly found no effect for the other conditions.
+- **Caveats:** it shows associations, not causes. Neighbouring hours aren't independent, so the intervals
+  are optimistic.
+
+### Next steps once there's a season of data
+
+- **Occupancy models** separate "not there" from "there but too murky to see", using turbidity and time
+  of day as detection covariates.
+- **Forecasts:** the odds of a sea lion or a ray in the next hour, given the tide and conditions now.
+- **A detector fine-tuned on this camera's small fish** would count schools much better than the
+  motion-speck estimate.
 
 ## Performance
 
@@ -300,7 +346,7 @@ dotnet publish host -c Release -o app
 # 2. Tracker environment (CPU-only PyTorch first so nothing pulls a CUDA build)
 py -3.12 -m venv tracker\.venv
 tracker\.venv\Scripts\pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
-tracker\.venv\Scripts\pip install -r tracker\requirements-setup.txt
+tracker\.venv\Scripts\pip install -r tracker\requirements-setup.txt -r tracker\requirements-ml.txt
 
 # 3. Download and convert the models (about 1.9 GB download, 2-3 minutes)
 tracker\.venv\Scripts\python tracker\setup_models.py
@@ -326,7 +372,8 @@ Re-run `setup_models.py` after editing `tracker/species.json`. To publish result
 ### Reviewing uncertain sightings
 
 Tray icon → **Review uncertain sightings (N)...** shows each saved picture: the close-up on the left, and
-where it was in the frame on the right. The top line says which kind it is:
+where it was in the frame on the right. The bottom line shows how many answers each animal has toward the
+camera-trained classifier. The top line says which kind it is:
 - **"The tracker wasn't sure. Is it one of these?"**
 - **"The tracker logged this as a ___. Is that right?"** Press `1` if it's right. Otherwise pick the
   right animal, or press `N`.
@@ -334,7 +381,7 @@ where it was in the frame on the right. The top line says which kind it is:
 | Key | Action |
 |---|---|
 | `1` `2` `3` | It's the tracker's 1st, 2nd or 3rd guess |
-| Pick from the list → **Approve as this** | It's a different animal |
+| Pick from the list → **Approve as this** | It's a different animal. The list ends with the look-alike groups ("group: silversides & sardines") for when you can tell the kind of fish but not the species |
 | `N` | Not an animal |
 | `S` or `→` | Skip for now |
 
@@ -364,7 +411,9 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
-| `data/environment_hourly.csv` | Hourly conditions at the pier (NOAA + SCCOOS) |
+| `data/environment_hourly.csv` | Hourly conditions at the pier (NOAA + SCCOOS), temperature anomaly, El Niño index |
+| `data/ml/classifier_report.md` | Latest camera-classifier training report |
+| `logs/nightly.log` | What the nightly job did |
 | `frames/` | The latest tracker frame, and the stills used by `--off` |
 | `logs/host.log`, `logs/tracker.log` | What the app and tracker did |
 
@@ -375,7 +424,12 @@ host/                 LiveCams wallpaper app (C#, .NET 8, WebView2)
 tracker/
   tracker.py          the background tracker
   setup_models.py     one-time model download + OpenVINO conversion
-  environment.py      hourly conditions at the pier (NOAA tide gauge + SCCOOS shore station)
+  environment.py      hourly conditions at the pier (NOAA tide gauge + SCCOOS shore station),
+                      temperature anomaly and El Nino index
+  nightly.py          once-a-day job: conditions, retraining, conditions model, publish
+  ml/
+    train_classifier.py  camera-trained classifier from review answers
+    conditions_model.py  "what brings animals in" regressions
   publish_results.py  daily README/results update
   species.json        the animals it can name (edit to taste)
 results/              published summaries: daily, hourly sightings, hourly conditions,
@@ -397,6 +451,7 @@ livecams.json         configuration
     [OpenCLIP](https://github.com/mlfoundations/open_clip)
 - **Conditions data:**
   - NOAA CO-OPS, tide station 9410230 La Jolla (public domain).
+  - NOAA Climate Prediction Center, Oceanic Niño Index (public domain).
   - SCCOOS Automated Shore Station, Scripps Pier, served by CeNCOOS. Free to use and redistribute; please
     credit CeNCOOS and NOAA. Not for legal use; the providers give no warranty.
 - **Runtime:** [OpenVINO](https://github.com/openvinotoolkit/openvino) (Apache-2.0),

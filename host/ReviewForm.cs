@@ -13,14 +13,19 @@ namespace LiveCams;
 internal sealed class ReviewForm : Form
 {
     private sealed record Guess(string Common, string Scientific, string Category, double Prob);
-    private sealed record Species(string Common, string Scientific, string Category);
+    private sealed record Species(string Common, string Scientific, string Category, bool IsGroup = false)
+    {
+        public override string ToString() => IsGroup ? $"group: {Common}" : Common;
+    }
 
     private readonly string pendingDir, approvedDir, rejectedDir, decisionsCsv;
     private readonly List<Species> species;
     private readonly PictureBox picture = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(24, 28, 34) };
     private readonly Label info = new() { Dock = DockStyle.Top, Height = 32, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
     private readonly FlowLayoutPanel guessRow = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(4) };
-    private readonly ComboBox other = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox other = new() { Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Label progress = new() { Dock = DockStyle.Bottom, Height = 26, ForeColor = Color.DimGray,
+                                             TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
     private List<string> items = new();
     private List<Guess> guesses = new();
     private string kind = "uncertain", loggedAs = "";
@@ -41,7 +46,8 @@ internal sealed class ReviewForm : Form
         KeyPreview = true;
         Font = new Font("Segoe UI", 10);
 
-        other.Items.AddRange(species.Select(s => (object)s.Common).ToArray());
+        other.Items.AddRange(species.Cast<object>().ToArray());
+        progress.Text = TrainingProgress();
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(4) };
         bottom.Controls.Add(new Label { Text = "Something else:", AutoSize = true, Margin = new Padding(6, 12, 0, 0) });
         bottom.Controls.Add(other);
@@ -56,6 +62,7 @@ internal sealed class ReviewForm : Form
         Controls.Add(guessRow);
         Controls.Add(info);
         Controls.Add(bottom);
+        Controls.Add(progress);
 
         KeyDown += (_, e) =>
         {
@@ -160,17 +167,43 @@ internal sealed class ReviewForm : Form
         File.Move(json, Path.Combine(destDir, Path.GetFileName(json)), overwrite: true);
         if (File.Exists(jpg)) File.Move(jpg, Path.Combine(destDir, Path.GetFileName(jpg)), overwrite: true);
         items.RemoveAt(index);
+        progress.Text = TrainingProgress();
         ShowItem(index);
     }
 
+    /// <summary>Every animal in species.json, then its look-alike groups ("group: silversides &amp; sardines"),
+    /// for when the kind of fish is clear but the exact species isn't.</summary>
     private static List<Species> LoadSpecies(string path)
     {
         if (!File.Exists(path)) return new();
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        return doc.RootElement.GetProperty("species").EnumerateArray()
+        var all = doc.RootElement.GetProperty("species").EnumerateArray().ToList();
+        var animals = all
             .Select(s => new Species(s.GetProperty("common").GetString()!, s.GetProperty("scientific").GetString()!,
                 s.GetProperty("category").GetString()!))
-            .OrderBy(s => s.Common, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .OrderBy(s => s.Common, StringComparer.OrdinalIgnoreCase);
+        var groups = all
+            .Where(s => s.TryGetProperty("group", out _))
+            .GroupBy(s => s.GetProperty("group").GetString()!)
+            .Select(g => new Species(g.Key, "", g.First().GetProperty("category").GetString()!, IsGroup: true))
+            .OrderBy(g => g.Common, StringComparer.OrdinalIgnoreCase);
+        return animals.Concat(groups).ToList();
+    }
+
+    /// <summary>How many answers each animal has so far: what the camera-trained classifier learns from.</summary>
+    private string TrainingProgress()
+    {
+        if (!File.Exists(decisionsCsv)) return "No answers yet.";
+        var counts = new Dictionary<string, int>();
+        foreach (var line in File.ReadLines(decisionsCsv).Skip(1))
+        {
+            var cells = line.Trim('"').Split("\",\"");  // every field is quoted (see Decide)
+            if (cells.Length < 7) continue;
+            string label = cells[5] == "approved" ? cells[6] : "not an animal";
+            counts[label] = counts.GetValueOrDefault(label) + 1;
+        }
+        var top = counts.OrderByDescending(kv => kv.Value).Take(5).Select(kv => $"{kv.Key} {kv.Value}");
+        return $"Answers so far: {counts.Values.Sum()} ({string.Join(", ", top)}). The camera-trained " +
+               "classifier learns an animal at 12 answers; ~30 makes it reliable.";
     }
 }

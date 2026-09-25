@@ -1,0 +1,6 @@
+# For the nightly learning steps (tracker/ml/): training the camera-specific classifier and
+# modeling sightings against the pier's conditions. The always-on tracker doesn't import these.
+-r requirements.txt
+scikit-learn==1.9.1
+pandas==3.0.6
+statsmodels==0.15.0

@@ -32,6 +32,7 @@ CROPS = ROOT / "data" / "crops"
 DECISIONS_CSV = ROOT / "data" / "review" / "decisions.csv"
 CONFIRMED_CSV = RESULTS / "confirmed_by_hand.csv"
 ENV_CSV = environment.ENV_CSV
+CLASSIFIER_REPORT = ROOT / "data" / "ml" / "classifier_report.md"
 README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
@@ -304,7 +305,9 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, env):
         "    bar [" + ", ".join(str(v) for v in by_hour_of_day) + "]",
         "```",
         "",
-        "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv).",
+        "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: "
+        "[what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the "
+        "[camera-trained classifier](results/camera_classifier.md) (trained from the review answers).",
     ]
     return "\n".join(lines + render_conditions(days, env) + render_confirmed(confirmed, rejected)
                      + render_validation(validation))
@@ -333,15 +336,18 @@ def publish_hourly(first_day):
             writer.writerows(r for r in reader if r["date"] >= first_day)
 
 
-def main(push=True):
+def main(push=True, update_environment=True):
     effort, species = load_hourly()
     days, by_hour = build(effort, species)
     first_day = min(days) if days else None
-    try:
-        environment.update(date.fromisoformat(first_day) if first_day else None)
-    except Exception as e:  # conditions are a bonus; never block the daily publish on them
-        print(f"could not update conditions: {e}")
+    if update_environment:
+        try:
+            environment.update(date.fromisoformat(first_day) if first_day else None)
+        except Exception as e:  # conditions are a bonus; never block the daily publish on them
+            print(f"could not update conditions: {e}")
     publish_hourly(first_day)
+    if CLASSIFIER_REPORT.exists():
+        shutil.copyfile(CLASSIFIER_REPORT, RESULTS / "camera_classifier.md")
     write_daily(days)
     validation = update_validation()
     confirmed, rejected, checks = read_reviews()
