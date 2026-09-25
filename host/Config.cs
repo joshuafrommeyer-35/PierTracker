@@ -55,6 +55,15 @@ internal sealed class AppConfig
 
     public TrackerConfig Tracker { get; set; } = new();
 
+    /// <summary>
+    /// Show a Windows notification about sightings waiting for review at most this often (hours; 0 = never).
+    /// Either way the tray icon gets a dot while any are waiting.
+    /// </summary>
+    public double ReviewReminderHours { get; set; } = 24;
+
+    /// <summary>Only notify when at least this many sightings are waiting.</summary>
+    public int ReviewReminderMinPending { get; set; } = 10;
+
     /// <summary>If &gt; 0, expose Chrome DevTools on this localhost port (troubleshooting only).</summary>
     public int DebugPort { get; set; }
 

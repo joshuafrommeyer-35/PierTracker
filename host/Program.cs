@@ -84,11 +84,15 @@ internal sealed class LiveCamsApp : ApplicationContext
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan GameOverDelay = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ReviewCheckInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan NoReminderAfterStart = TimeSpan.FromMinutes(15);
 
     private readonly AppConfig config;
     private readonly string configDir;
     private readonly List<CamWindow> windows = new();
     private readonly NotifyIcon tray;
+    private readonly Icon trayIcon = MakeTrayIcon(badge: false), trayIconBadge = MakeTrayIcon(badge: true);
+    private readonly DateTime startedAt = DateTime.UtcNow;
     private readonly System.Windows.Forms.Timer timer = new();
     private readonly ShellWatcher shellWatcher;
     private readonly DesktopClickWatcher desktopClicks;
@@ -103,6 +107,8 @@ internal sealed class LiveCamsApp : ApplicationContext
     private DateTime lastFullscreenSeen;
     private DateTime lastEfficiencyPass;
     private ReviewForm? reviewForm;
+    private int pendingReviews;
+    private DateTime lastReviewCheck;
 
     public LiveCamsApp()
     {
@@ -113,8 +119,9 @@ internal sealed class LiveCamsApp : ApplicationContext
         Log.Write($"starting; config {configPath}");
         Native.SetEfficiencyMode(Environment.ProcessId);
 
-        tray = new NotifyIcon { Icon = MakeTrayIcon(), Text = "LiveCams", Visible = true, ContextMenuStrip = new ContextMenuStrip() };
+        tray = new NotifyIcon { Icon = trayIcon, Text = "LiveCams", Visible = true, ContextMenuStrip = new ContextMenuStrip() };
         tray.ContextMenuStrip.Opening += (_, _) => RebuildMenu();
+        tray.BalloonTipClicked += (_, _) => OpenReview();
         tray.DoubleClick += async (_, _) => { foreach (var w in windows) await w.ForceResumeAsync(); };
 
         // Clicking empty desktop on a cam's monitor resumes that cam (or reloads it if it's broken).
@@ -212,6 +219,7 @@ internal sealed class LiveCamsApp : ApplicationContext
                     await w.TickAsync(watched);
                 }
             }
+            CheckReviews();
             UpdateTrayText();
         }
         catch (Exception ex)
@@ -255,6 +263,7 @@ internal sealed class LiveCamsApp : ApplicationContext
         string text = gameMode
             ? "LiveCams: paused for full-screen app"
             : string.Join("\n", windows.Select(w => $"{w.Cam.Name}: {Short(w.Status)}{(w.DisplayFrozen ? " (frozen)" : "")}"));
+        if (pendingReviews > 0) text += $"\n{pendingReviews} sightings to review";
         tray.Text = text.Length > 127 ? text[..127] : text;
     }
 
@@ -289,8 +298,40 @@ internal sealed class LiveCamsApp : ApplicationContext
             return;
         }
         reviewForm = new ReviewForm(configDir);
-        reviewForm.FormClosed += (_, _) => reviewForm = null;
+        reviewForm.FormClosed += (_, _) =>
+        {
+            reviewForm = null;
+            lastReviewCheck = DateTime.MinValue; // clear the dot right away if the queue is empty now
+        };
         reviewForm.Show();
+    }
+
+    /// <summary>
+    /// Sightings waiting for a person: a dot on the tray icon, plus now and then a notification.
+    /// The notification only comes while you're at the PC and not in a game, and never twice
+    /// within <see cref="AppConfig.ReviewReminderHours"/> (remembered across restarts).
+    /// </summary>
+    private void CheckReviews()
+    {
+        var now = DateTime.UtcNow;
+        if (now - lastReviewCheck < ReviewCheckInterval) return;
+        lastReviewCheck = now;
+        pendingReviews = ReviewForm.PendingCount(configDir);
+        var icon = pendingReviews > 0 ? trayIconBadge : trayIcon;
+        if (tray.Icon != icon) tray.Icon = icon;
+
+        if (config.ReviewReminderHours <= 0 || pendingReviews < config.ReviewReminderMinPending) return;
+        if (gameMode || reviewForm != null || now - startedAt < NoReminderAfterStart) return;
+        if (Native.UserIdleTime() > TimeSpan.FromMinutes(1) || Native.FullscreenAppRunning()) return;
+        string stamp = Path.Combine(configDir, "data", "review", "last_reminder.txt");
+        if (File.Exists(stamp) && DateTime.TryParse(File.ReadAllText(stamp), null,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var last) &&
+            now - last < TimeSpan.FromHours(config.ReviewReminderHours))
+            return;
+        File.WriteAllText(stamp, now.ToString("o"));
+        Log.Write($"review reminder: {pendingReviews} waiting");
+        tray.ShowBalloonTip(10000, "Pier sightings to review",
+            $"{pendingReviews} sightings are waiting for a look. Click here to open the review window.", ToolTipIcon.None);
     }
 
     /// <summary>
@@ -357,12 +398,15 @@ internal sealed class LiveCamsApp : ApplicationContext
         foreach (var w in windows) w.Dispose();
         tray.Visible = false;
         tray.Dispose();
+        trayIcon.Dispose();
+        trayIconBadge.Dispose();
         if (!wallpaperFrozen) Native.RefreshStaticWallpaper(); // repaint the normal wallpaper where the cams were
         Log.Write("exited");
         base.ExitThreadCore();
     }
 
-    private static Icon MakeTrayIcon()
+    /// <param name="badge">Adds an amber dot: sightings are waiting for review.</param>
+    private static Icon MakeTrayIcon(bool badge)
     {
         using var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))
@@ -372,6 +416,11 @@ internal sealed class LiveCamsApp : ApplicationContext
             using var pen = new Pen(Color.White, 3);
             g.DrawBezier(pen, 5, 18, 10, 10, 15, 26, 20, 16);
             g.DrawBezier(pen, 20, 16, 23, 11, 26, 16, 28, 14);
+            if (badge)
+            {
+                g.FillEllipse(new SolidBrush(Color.FromArgb(255, 176, 32)), 18, 0, 14, 14);
+                g.DrawEllipse(new Pen(Color.FromArgb(40, 40, 40), 1.5f), 18, 0, 14, 14);
+            }
         }
         return Icon.FromHandle(bmp.GetHicon());
     }

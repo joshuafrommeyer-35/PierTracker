@@ -8,7 +8,8 @@ namespace LiveCams;
 /// and a sample of names it did log ("check"). Approve a guess, pick the right animal, or
 /// mark it "not an animal". Decisions go to data/review/decisions.csv; answers to checks
 /// become the published accuracy, approved uncertain ones the "Confirmed by hand" list.
-/// Keys: 1-3 pick a guess, N = not an animal, S or Right = skip.
+/// Keys: 1-3 pick a guess, N = not an animal, S or Right = skip, C = copy the picture
+/// (to paste into a chat or iNaturalist when you want help with an ID; skip it meanwhile).
 /// </summary>
 internal sealed class ReviewForm : Form
 {
@@ -57,6 +58,7 @@ internal sealed class ReviewForm : Form
         }));
         bottom.Controls.Add(MakeButton("Not an animal  (N)", Reject));
         bottom.Controls.Add(MakeButton("Skip  (S)", () => ShowItem(index + 1)));
+        bottom.Controls.Add(MakeButton("Copy picture  (C)", CopyPicture));
 
         Controls.Add(picture);
         Controls.Add(guessRow);
@@ -66,10 +68,12 @@ internal sealed class ReviewForm : Form
 
         KeyDown += (_, e) =>
         {
+            if (other.Focused) return; // typing in the list jumps to an animal; it isn't a shortcut
             if (e.KeyCode is >= Keys.D1 and <= Keys.D3 && e.KeyCode - Keys.D1 < guesses.Count)
                 Approve(guesses[e.KeyCode - Keys.D1]);
             else if (e.KeyCode == Keys.N) Reject();
             else if (e.KeyCode is Keys.S or Keys.Right) ShowItem(index + 1);
+            else if (e.KeyCode == Keys.C) CopyPicture();
             else return;
             e.Handled = true;
         };
@@ -129,6 +133,11 @@ internal sealed class ReviewForm : Form
             var guess = guesses[g];
             guessRow.Controls.Add(MakeButton($"{g + 1}. {guess.Common}  ({guess.Prob:P0})", () => Approve(guess)));
         }
+    }
+
+    private void CopyPicture()
+    {
+        if (picture.Image != null) Clipboard.SetImage(picture.Image);
     }
 
     private void Approve(Guess g) => Decide("approved", g.Common, g.Scientific, g.Category);

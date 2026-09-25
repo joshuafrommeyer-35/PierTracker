@@ -619,10 +619,15 @@ Re-run `setup_models.py` after editing `tracker/species.json`. To publish result
 | `app\LiveCams.exe --off` | Each monitor freezes on its current cam picture (saved as a normal Windows wallpaper), then everything shuts down. Nothing keeps running. Removes the login start |
 | `app\LiveCams.exe --quit` | Shuts down without freezing; your normal wallpaper comes back |
 | Click the empty desktop on a cam's monitor | Resumes that cam, or reloads it if it's broken. On the underwater monitor: go live again |
-| Tray icon (wave) | Status on hover. Menu: review uncertain sightings, resume a cam, reload, open the folder, turn off. Double-click resumes everything |
+| Tray icon (wave) | Status on hover. Menu: review uncertain sightings, resume a cam, reload, open the folder, turn off. Double-click resumes everything. An amber dot means sightings are waiting for review |
 | `app\LiveCams.exe --review` | The review window on its own, even while the cams are off |
 
 ### Reviewing uncertain sightings
+
+**Reminder.** While sightings are waiting, the tray icon has an amber dot and its tooltip gives the
+count. At most once a day, when 10 or more are waiting, a Windows notification says so; clicking it
+opens the review window. It only appears while you're using the PC, never during a game or other
+full-screen app or in the first 15 minutes after login, and Windows' Do Not Disturb silences it.
 
 Tray icon → **Review uncertain sightings (N)...** shows each saved picture: the close-up on the left, and
 where it was in the frame on the right. The bottom line shows how many answers each animal has toward the
@@ -637,6 +642,7 @@ camera-trained classifier. The top line says which kind it is:
 | Pick from the list → **Approve as this** | It's a different animal. The list ends with the look-alike groups ("group: silversides & sardines") for when you can tell the kind of fish but not the species |
 | `N` | Not an animal |
 | `S` or `→` | Skip for now |
+| `C` | Copy the picture, to paste into a chat or iNaturalist when you want help with the ID (skip it meanwhile; it stays in the queue) |
 
 Decisions go to `data/review/decisions.csv`, and the pictures move to `data/review/approved` or
 `data/review/rejected`. The next daily publish lists confirmed animals under **Confirmed by hand**.
@@ -653,6 +659,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `cams[].captureEverySeconds` / `captureDir` | Save a frame for the tracker this often |
 | `watchedIdleSeconds` / `coverThreshold` | What counts as "someone is looking" |
 | `pauseDuringFullscreenApps` | Unload the cams during games and other full-screen apps |
+| `reviewReminderHours` / `reviewReminderMinPending` | Review notification at most this often (default 24 h; 0 = tray dot only), and only with at least this many waiting (default 10) |
 | `tracker.enabled` / `publishResults` | Run the tracker; push daily results to GitHub |
 | `tracker.backupDir` | Folder for the nightly backup (e.g. on Google Drive); leave out for none |
 | `debugPort` | Troubleshooting only (Chrome DevTools on localhost). Keep at 0 |
