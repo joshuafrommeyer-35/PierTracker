@@ -18,76 +18,7 @@ See [Performance](#performance).
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-09-25 10:06 (Pacific). Tracking since 2026-09-25._
-
-| | |
-|---|---|
-| Days tracked | 1 |
-| Snapshots analyzed (one every 10 s while streaming) | 270 |
-| Clear-water daylight footage analyzed | 0.8 h |
-| Daylight too murky to identify anything | 0.0 h |
-| Animal types seen | 15 |
-
-### Animals seen
-
-"Snapshots" counts snapshots the animal was in, not individual animals: a fish that hangs around
-for a minute shows up in about six snapshots. "Most at once" is the biggest count in one snapshot.
-Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish
-(too small to name) the count is a rough estimate from the moving specks, rounded.
-
-Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many
-of its names a person has looked at so far, and how many were right.
-
-| Animal | Type | Snapshots | % of clear-water snapshots | Most at once | Days seen | First seen | Last seen | Checked |
-|---|---|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | 147 | 54.44% | 600 | 1 | 2026-09-25 | 2026-09-25 | — |
-| blacksmith | fish | 54 | 20.00% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| fish (unidentified) | fish | 31 | 11.48% | 4 | 1 | 2026-09-25 | 2026-09-25 | — |
-| kelp bass | fish | 13 | 4.81% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| Pacific sardine | fish | 11 | 4.07% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| silversides & sardines |  | 10 | 3.70% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| sargo | fish | 6 | 2.22% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| blacksmith (school) | fish | 5 | 1.85% | 6 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| senorita | fish | 4 | 1.48% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| California spiny lobster | invertebrate | 3 | 1.11% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| barred sand bass | fish | 2 | 0.74% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| salema | fish | 2 | 0.74% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| damselfishes (garibaldi, blacksmith) |  | 1 | 0.37% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| grunts (salema, sargo) |  | 1 | 0.37% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| sea basses |  | 1 | 0.37% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| topsmelt | fish | 1 | 0.37% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-
-### Sightings per day (up to the last 14 days)
-
-```mermaid
-xychart-beta
-    x-axis ["09-25"]
-    y-axis "Animal snapshots"
-    bar [292]
-```
-
-### When animals show up (all days, Pacific time)
-
-```mermaid
-xychart-beta
-    x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
-    y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 292, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-```
-
-Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: [what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the [camera-trained classifier](results/camera_classifier.md) (trained from the review answers).
-
-### Conditions at the pier
-
-From sensors on the pier: water temperature, turbidity and chlorophyll from the SCCOOS shore station (~5 m deep, next to the camera; only readings that passed quality control), and the tide from NOAA's La Jolla gauge. Hourly values for every day are in [`results/environment_hourly.csv`](results/environment_hourly.csv), next to the hourly sightings in [`results/hourly_summary.csv`](results/hourly_summary.csv).
-
-| Date | Water temp (°C) | Turbidity, daytime (NTU) | Chlorophyll (µg/L) | Tide range (m) | Animal snapshots |
-|---|---:|---:|---:|---:|---:|
-| 2026-09-25 | 23.0 | 0.23 | 0.41 | 1.49 | 292 |
-
-### Validation (hand-checked samples)
-
-_No names have been checked by a person yet, so treat the names above as unverified model guesses._
+_No results yet. The tracker publishes here once a day after it starts running._
 <!-- RESULTS:END -->
 
 ## How it works
