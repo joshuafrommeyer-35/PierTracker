@@ -1,21 +1,32 @@
 date,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,encounters,snapshots_seen,max_count
-2026-09-25,541,0,0,Pacific sardine,1,6,1
-2026-09-25,541,0,0,barred sand bass,1,1,1
-2026-09-25,541,0,0,blacksmith,1,131,4
-2026-09-25,541,0,0,blacksmith (school),2,20,9
-2026-09-25,541,0,0,bullseye pufferfish,1,1,1
-2026-09-25,541,0,0,croakers,1,1,1
-2026-09-25,541,0,0,"damselfishes (garibaldi, blacksmith)",1,1,1
-2026-09-25,541,0,0,fish (unidentified),,98,4
-2026-09-25,541,0,0,garibaldi,1,1,1
-2026-09-25,541,0,0,giant kelpfish,2,2,1
-2026-09-25,541,0,0,halfmoon,1,1,1
-2026-09-25,541,0,0,jacksmelt,2,3,2
-2026-09-25,541,0,0,kelp bass,1,15,1
-2026-09-25,541,0,0,mackerels & bonito,1,1,1
-2026-09-25,541,0,0,market squid,1,1,1
-2026-09-25,541,0,0,ocean whitefish,1,4,2
-2026-09-25,541,0,0,salema,2,9,3
-2026-09-25,541,0,0,silversides & sardines,1,10,4
-2026-09-25,541,0,0,silversides & sardines (school),1,1,5
-2026-09-25,541,0,0,small fish (school),,404,600
+2026-09-25,1539,0,0,California scorpionfish,1,1,1
+2026-09-25,1539,0,0,California spiny lobster,1,94,1
+2026-09-25,1539,0,0,Pacific barracuda,1,1,1
+2026-09-25,1539,0,0,Pacific bonito,1,1,1
+2026-09-25,1539,0,0,Pacific chub mackerel,1,1,1
+2026-09-25,1539,0,0,Pacific sardine,6,15,2
+2026-09-25,1539,0,0,barred sand bass,1,1,1
+2026-09-25,1539,0,0,bat ray,1,1,1
+2026-09-25,1539,0,0,blacksmith,2,154,4
+2026-09-25,1539,0,0,blacksmith (school),2,20,9
+2026-09-25,1539,0,0,croakers,1,1,1
+2026-09-25,1539,0,0,"damselfishes (garibaldi, blacksmith)",1,1,1
+2026-09-25,1539,0,0,finescale triggerfish,1,1,1
+2026-09-25,1539,0,0,fish (unidentified),,178,4
+2026-09-25,1539,0,0,fish (unidentified) (school),,4,6
+2026-09-25,1539,0,0,garibaldi,2,2,1
+2026-09-25,1539,0,0,giant kelpfish,2,4,1
+2026-09-25,1539,0,0,"grunts (salema, sargo)",1,1,1
+2026-09-25,1539,0,0,halfmoon,1,1,1
+2026-09-25,1539,0,0,jacksmelt,4,6,2
+2026-09-25,1539,0,0,kelp bass,2,88,1
+2026-09-25,1539,0,0,mackerels & bonito,2,2,1
+2026-09-25,1539,0,0,opaleye,2,2,1
+2026-09-25,1539,0,0,pile perch,1,1,1
+2026-09-25,1539,0,0,salema,4,31,4
+2026-09-25,1539,0,0,salema (school),1,1,5
+2026-09-25,1539,0,0,sargo,1,1,1
+2026-09-25,1539,0,0,silversides & sardines,5,37,4
+2026-09-25,1539,0,0,silversides & sardines (school),1,1,5
+2026-09-25,1539,0,0,small fish (school),,679,600
+2026-09-25,1539,0,0,topsmelt,1,1,1

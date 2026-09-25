@@ -1,1 +1,50 @@
-taken_at,kind,tracker_logged_as,decision,person_says,tracker_best_guess,tracker_best_guess_prob
+taken_at,kind,tracker_logged_as,decision,answer,tracker_best_guess,tracker_best_guess_prob,reviewer
+2026-09-25T09:33:45,uncertain,,rejected,,sheep crab,0.568,claude
+2026-09-25T09:34:09,uncertain,,approved,California spiny lobster,California spiny lobster,0.882,claude
+2026-09-25T10:08:29,check,shovelnose guitarfish,rejected,,shovelnose guitarfish,0.965,claude
+2026-09-25T10:19:29,uncertain,,rejected,,purple-striped jellyfish,0.476,claude
+2026-09-25T10:39:24,uncertain,,rejected,,black sea nettle jellyfish,0.448,claude
+2026-09-25T10:40:22,uncertain,,rejected,,leopard shark,0.504,claude
+2026-09-25T10:42:28,uncertain,,rejected,,rubberlip seaperch,0.525,claude
+2026-09-25T10:43:01,uncertain,,rejected,,round stingray,0.590,claude
+2026-09-25T10:43:37,check,giant sea bass,rejected,,giant sea bass,0.937,claude
+2026-09-25T10:45:19,uncertain,,rejected,,sheep crab,0.561,claude
+2026-09-25T10:50:10,uncertain,,rejected,,sheep crab,0.528,claude
+2026-09-25T10:53:40,uncertain,,rejected,,octopus,0.683,claude
+2026-09-25T11:07:54,check,green sea turtle,rejected,,green sea turtle,1.000,claude
+2026-09-25T11:11:57,uncertain,,rejected,,sheep crab,0.770,claude
+2026-09-25T11:14:06,check,sheep crab,rejected,,sheep crab,0.905,claude
+2026-09-25T11:30:35,check,green sea turtle,rejected,,green sea turtle,0.968,claude
+2026-09-25T11:35:29,uncertain,,rejected,,octopus,0.522,claude
+2026-09-25T11:36:38,uncertain,,rejected,,leopard shark,0.578,claude
+2026-09-25T11:48:51,check,green sea turtle,rejected,,green sea turtle,1.000,claude
+2026-09-25T11:52:42,uncertain,,rejected,,sheep crab,0.505,claude
+2026-09-25T11:53:15,uncertain,,rejected,,green sea turtle,0.542,claude
+2026-09-25T11:54:21,check,giant kelpfish,rejected,,giant kelpfish,0.932,claude
+2026-09-25T11:55:09,uncertain,,rejected,,octopus,0.808,claude
+2026-09-25T11:59:12,check,market squid,rejected,,market squid,0.903,claude
+2026-09-25T12:00:12,uncertain,,rejected,,finescale triggerfish,0.723,claude
+2026-09-25T12:01:51,uncertain,,rejected,,octopus,0.762,claude
+2026-09-25T12:07:18,uncertain,,rejected,,market squid,0.518,claude
+2026-09-25T12:07:18,uncertain,,rejected,,octopus,0.877,claude
+2026-09-25T12:09:31,check,giant kelpfish,rejected,,giant kelpfish,0.920,claude
+2026-09-25T12:14:22,uncertain,,rejected,,giant sea bass,0.483,claude
+2026-09-25T12:18:10,uncertain,,rejected,,market squid,0.586,claude
+2026-09-25T12:20:40,check,giant sea bass,rejected,,giant sea bass,0.959,claude
+2026-09-25T12:23:50,uncertain,,rejected,,market squid,0.683,claude
+2026-09-25T12:27:02,check,green sea turtle,rejected,,green sea turtle,0.967,claude
+2026-09-25T12:29:26,uncertain,,rejected,,octopus,0.591,claude
+2026-09-25T12:35:44,check,California spiny lobster,approved,California spiny lobster,California spiny lobster,0.999,claude
+2026-09-25T12:42:49,uncertain,,rejected,,octopus,0.566,claude
+2026-09-25T12:45:24,uncertain,,approved,California spiny lobster,California spiny lobster,0.999,claude
+2026-09-25T12:45:36,uncertain,,rejected,,jacksmelt,0.354,claude
+2026-09-25T12:45:36,uncertain,,rejected,,salema,0.484,claude
+2026-09-25T12:45:48,uncertain,,rejected,,senorita,0.753,claude
+2026-09-25T12:46:12,uncertain,,rejected,,octopus,0.374,claude
+2026-09-25T12:47:25,uncertain,,rejected,,Pacific sardine,0.353,claude
+2026-09-25T12:47:25,uncertain,,rejected,,salema,0.261,claude
+2026-09-25T12:47:37,uncertain,,rejected,,giant kelpfish,0.752,claude
+2026-09-25T12:47:37,uncertain,,rejected,,market squid,0.622,claude
+2026-09-25T13:04:18,uncertain,,approved,California spiny lobster,diamond stingray,0.925,claude
+2026-09-25T13:04:30,check,diamond stingray,approved,California spiny lobster,diamond stingray,0.966,claude
+2026-09-25T13:04:42,uncertain,,rejected,,octopus,0.865,claude

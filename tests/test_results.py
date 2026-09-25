@@ -46,3 +46,14 @@ def test_only_a_persons_answers_count_as_checks(tmp_path, monkeypatch):
     assert dict(checks) == {"kelp bass": [1, 0]}  # Claude's answers teach the tracker but aren't published as checks
     assert not confirmed and rejected == 0
     assert (tmp_path / "confirmed.csv").read_text(encoding="utf-8").count("claude") == 2  # but they're listed, marked
+
+
+def test_one_off_guesses_are_listed_separately():
+    days = {"2026-09-25": {"analyzed": 1000, "dark": 0, "murky": 0,
+                           "species": {"kelp bass": [30, 1], "Pacific barracuda": [1, 1], "garibaldi": [2, 1]}}}
+    encounters = {("2026-09-25", "kelp bass"): 1, ("2026-09-25", "Pacific barracuda"): 1, ("2026-09-25", "garibaldi"): 1}
+    confirmed = {"garibaldi": [1, "2026-09-25"]}  # a person approved one
+    text = pr.render(days, [0] * 24, {}, confirmed, 0, [], encounters)
+    main, _, rest = text.partition("<details><summary>Seen briefly")
+    assert "| kelp bass |" in main and "| garibaldi |" in main   # seen repeatedly / confirmed by a person
+    assert "Pacific barracuda" not in main and "| Pacific barracuda |" in rest  # a one-off guess

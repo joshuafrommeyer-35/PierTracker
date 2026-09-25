@@ -1,28 +1,74 @@
 date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,snapshots_seen,max_count
-2026-09-25,10,250,0,0,Pacific sardine,6,1
-2026-09-25,10,250,0,0,barred sand bass,1,1
-2026-09-25,10,250,0,0,blacksmith,69,4
-2026-09-25,10,250,0,0,blacksmith (school),8,8
-2026-09-25,10,250,0,0,fish (unidentified),51,4
-2026-09-25,10,250,0,0,garibaldi,1,1
-2026-09-25,10,250,0,0,giant kelpfish,1,1
-2026-09-25,10,250,0,0,halfmoon,1,1
-2026-09-25,10,250,0,0,jacksmelt,3,2
-2026-09-25,10,250,0,0,ocean whitefish,4,2
-2026-09-25,10,250,0,0,salema,8,3
-2026-09-25,10,250,0,0,silversides & sardines,9,4
-2026-09-25,10,250,0,0,silversides & sardines (school),1,5
-2026-09-25,10,250,0,0,small fish (school),177,600
-2026-09-25,11,291,0,0,blacksmith,62,4
-2026-09-25,11,291,0,0,blacksmith (school),12,9
-2026-09-25,11,291,0,0,bullseye pufferfish,1,1
-2026-09-25,11,291,0,0,croakers,1,1
-2026-09-25,11,291,0,0,"damselfishes (garibaldi, blacksmith)",1,1
-2026-09-25,11,291,0,0,fish (unidentified),47,3
-2026-09-25,11,291,0,0,giant kelpfish,1,1
-2026-09-25,11,291,0,0,kelp bass,15,1
-2026-09-25,11,291,0,0,mackerels & bonito,1,1
-2026-09-25,11,291,0,0,market squid,1,1
-2026-09-25,11,291,0,0,salema,1,1
-2026-09-25,11,291,0,0,silversides & sardines,1,1
-2026-09-25,11,291,0,0,small fish (school),227,400
+2026-09-25,10,248,0,0,Pacific sardine,6,1
+2026-09-25,10,248,0,0,barred sand bass,1,1
+2026-09-25,10,248,0,0,blacksmith,70,4
+2026-09-25,10,248,0,0,blacksmith (school),8,8
+2026-09-25,10,248,0,0,fish (unidentified),51,4
+2026-09-25,10,248,0,0,garibaldi,1,1
+2026-09-25,10,248,0,0,giant kelpfish,1,1
+2026-09-25,10,248,0,0,halfmoon,1,1
+2026-09-25,10,248,0,0,jacksmelt,3,2
+2026-09-25,10,248,0,0,salema,8,3
+2026-09-25,10,248,0,0,silversides & sardines,9,4
+2026-09-25,10,248,0,0,silversides & sardines (school),1,5
+2026-09-25,10,248,0,0,small fish (school),176,600
+2026-09-25,11,290,0,0,blacksmith,63,4
+2026-09-25,11,290,0,0,blacksmith (school),12,9
+2026-09-25,11,290,0,0,croakers,1,1
+2026-09-25,11,290,0,0,"damselfishes (garibaldi, blacksmith)",1,1
+2026-09-25,11,290,0,0,fish (unidentified),47,3
+2026-09-25,11,290,0,0,kelp bass,15,1
+2026-09-25,11,290,0,0,mackerels & bonito,1,1
+2026-09-25,11,290,0,0,salema,1,1
+2026-09-25,11,290,0,0,silversides & sardines,1,1
+2026-09-25,11,290,0,0,small fish (school),227,400
+2026-09-25,12,291,0,0,California spiny lobster,2,1
+2026-09-25,12,291,0,0,Pacific chub mackerel,1,1
+2026-09-25,12,291,0,0,Pacific sardine,2,1
+2026-09-25,12,291,0,0,blacksmith,10,3
+2026-09-25,12,291,0,0,fish (unidentified),25,4
+2026-09-25,12,291,0,0,fish (unidentified) (school),2,6
+2026-09-25,12,291,0,0,garibaldi,1,1
+2026-09-25,12,291,0,0,jacksmelt,1,1
+2026-09-25,12,291,0,0,kelp bass,18,1
+2026-09-25,12,291,0,0,opaleye,2,1
+2026-09-25,12,291,0,0,salema,5,2
+2026-09-25,12,291,0,0,silversides & sardines,5,2
+2026-09-25,12,291,0,0,small fish (school),102,250
+2026-09-25,13,280,0,0,California scorpionfish,1,1
+2026-09-25,13,280,0,0,California spiny lobster,44,1
+2026-09-25,13,280,0,0,Pacific barracuda,1,1
+2026-09-25,13,280,0,0,Pacific bonito,1,1
+2026-09-25,13,280,0,0,Pacific sardine,1,2
+2026-09-25,13,280,0,0,bat ray,1,1
+2026-09-25,13,280,0,0,blacksmith,4,2
+2026-09-25,13,280,0,0,finescale triggerfish,1,1
+2026-09-25,13,280,0,0,fish (unidentified),15,4
+2026-09-25,13,280,0,0,giant kelpfish,3,1
+2026-09-25,13,280,0,0,"grunts (salema, sargo)",1,1
+2026-09-25,13,280,0,0,kelp bass,19,1
+2026-09-25,13,280,0,0,salema,4,4
+2026-09-25,13,280,0,0,salema (school),1,5
+2026-09-25,13,280,0,0,silversides & sardines,3,1
+2026-09-25,13,280,0,0,small fish (school),38,200
+2026-09-25,14,281,0,0,California spiny lobster,48,1
+2026-09-25,14,281,0,0,Pacific sardine,4,2
+2026-09-25,14,281,0,0,blacksmith,7,2
+2026-09-25,14,281,0,0,fish (unidentified),23,2
+2026-09-25,14,281,0,0,fish (unidentified) (school),1,5
+2026-09-25,14,281,0,0,jacksmelt,2,1
+2026-09-25,14,281,0,0,kelp bass,24,1
+2026-09-25,14,281,0,0,pile perch,1,1
+2026-09-25,14,281,0,0,salema,7,1
+2026-09-25,14,281,0,0,sargo,1,1
+2026-09-25,14,281,0,0,silversides & sardines,12,1
+2026-09-25,14,281,0,0,small fish (school),83,150
+2026-09-25,15,149,0,0,Pacific sardine,2,1
+2026-09-25,15,149,0,0,fish (unidentified),17,3
+2026-09-25,15,149,0,0,fish (unidentified) (school),1,5
+2026-09-25,15,149,0,0,kelp bass,12,1
+2026-09-25,15,149,0,0,mackerels & bonito,1,1
+2026-09-25,15,149,0,0,salema,6,2
+2026-09-25,15,149,0,0,silversides & sardines,7,2
+2026-09-25,15,149,0,0,small fish (school),53,100
+2026-09-25,15,149,0,0,topsmelt,1,1

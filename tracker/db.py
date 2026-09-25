@@ -118,12 +118,24 @@ def migrate(con: sqlite3.Connection):
     con.commit()
 
 
-def apply_corrections(con: sqlite3.Connection):
-    """Review answers to "is this right?" pictures correct the sighting they were taken from: the name a
-    person (or a structure check by eye) gave, or '' for not an animal. The logged name stays in
-    common_name; statistics use the corrected one. Returns how many sightings were corrected."""
+def apply_corrections(con: sqlite3.Connection, corrections: Path = None):
+    """Corrections from checking the pictures. The logged name stays in common_name; statistics use
+    corrected_name ('' = not an animal). Returns how many sightings changed.
+
+    1. data/corrections.csv: sightings checked by eye outside the review window (columns from, to,
+       logged_as, corrected_to, reviewer, reason; from = to for a single sighting).
+    2. Answers to "is this right?" pictures in the review window, applied last and a person's after
+       Claude's, so a person's answer always wins."""
     fixed = 0
-    rows = con.execute("SELECT taken_at, logged_as, decision, answer FROM reviews WHERE kind = 'check'").fetchall()
+    corrections = corrections or LIVECAMS / "data" / "corrections.csv"
+    if corrections.exists():
+        with corrections.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                fixed += con.execute("UPDATE sightings SET corrected_name = ? WHERE taken_at BETWEEN ? AND ? "
+                                     "AND common_name = ? AND corrected_name IS NOT ?",
+                                     (r["corrected_to"], r["from"], r["to"], r["logged_as"], r["corrected_to"])).rowcount
+    rows = con.execute("SELECT taken_at, logged_as, decision, answer FROM reviews WHERE kind = 'check' "
+                       "ORDER BY CASE reviewer WHEN 'person' THEN 1 ELSE 0 END").fetchall()
     for taken_at, logged_as, decision, answer in rows:
         name = (answer or "") if decision == "approved" else ""
         if not logged_as or name == logged_as:

@@ -42,7 +42,11 @@ SNAPSHOT_SECONDS = 10  # LiveCams saves a frame this often (captureEverySeconds)
 # Sightings of the same animal closer together than this are one encounter: the usual camera-trap
 # rule for "independent detections" (results were found stable between 5 and 60 minutes).
 ENCOUNTER_GAP = timedelta(minutes=30)
-NO_ENCOUNTERS = ("small fish", "small fish (school)", "fish (unidentified)")  # a mix of kinds, not one animal
+NO_ENCOUNTERS = ("small fish", "small fish (school)", "fish (unidentified)", "fish (unidentified) (school)")  # a mix of kinds, not one animal
+# A name is listed in the main table once a person has confirmed it, or once it has been seen repeatedly:
+# a one-off guess (one "barracuda") isn't presented as a sighting. The rest are listed separately.
+LIST_MIN_SNAPSHOTS = 10
+LIST_MIN_ENCOUNTERS = 3
 NO_WINDOW = 0x08000000
 
 
@@ -378,6 +382,14 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
             t["first"] = t["first"] or d
             t["last"] = d
 
+    def listed(name):
+        """In the main table: the fish counts, anything a person confirmed, or anything seen repeatedly."""
+        base = base_name(name)
+        t = totals[name]
+        right = validation.get(base, (0, 0))[0] - validation.get(base, (0, 0))[1]
+        return (name in NO_ENCOUNTERS or base in confirmed or right > 0
+                or t["seen"] >= LIST_MIN_SNAPSHOTS or t["encounters"] >= LIST_MIN_ENCOUNTERS)
+
     lines = [
         f"_Last updated {datetime.now():%Y-%m-%d %H:%M} (Pacific). Tracking since {first}._" + tracker_status(),
         "",
@@ -387,7 +399,7 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         f"| Snapshots analyzed (one every {SNAPSHOT_SECONDS} s while streaming) | {analyzed:,} |",
         f"| Clear-water daylight footage analyzed | {daylight * SNAPSHOT_SECONDS / 3600:,.1f} h |",
         f"| Daylight too murky to identify anything | {murky * SNAPSHOT_SECONDS / 3600:,.1f} h |",
-        f"| Animal types seen | {sum(1 for n in totals if n != 'fish (unidentified)')} |",
+        f"| Animal types seen repeatedly or confirmed | {sum(1 for n in totals if listed(n) and n not in NO_ENCOUNTERS)} |",
         "",
         "### Animals seen",
         "",
@@ -403,12 +415,19 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "(too small to name) the count is a rough estimate from the moving specks, rounded.",
         "",
         "Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many",
-        "of its names a person has looked at so far, and how many were right.",
+        "of its names a person has looked at so far, and how many were right. Listed here: animals a person",
+        f"has confirmed, or seen repeatedly ({LIST_MIN_SNAPSHOTS}+ snapshots or {LIST_MIN_ENCOUNTERS}+ separate encounters). "
+        "Brief one-off guesses are listed separately below the table. Sightings found to be wrong by checking",
+        "the pictures are corrected (a lobster's antenna is not a stingray).",
         "",
         "| Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |",
         "|---|---|---:|---:|---:|---:|---:|---|---|---|",
     ]
+    minor = []
     for name, t in sorted(totals.items(), key=lambda kv: -kv[1]["seen"]):
+        if not listed(name):
+            minor.append((name, t))
+            continue
         pct = 100 * t["seen"] / daylight if daylight else 0
         base = base_name(name)
         r, w = validation.get(base, (0, 0))
@@ -416,6 +435,13 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         enc = "—" if name in NO_ENCOUNTERS else f"{t['encounters']:,}"
         lines.append(f"| {name} | {cats.get(base, '')} | {enc} | {t['seen']:,} | {pct:.2f}% | {t['max']} | "
                      f"{t['days']} | {t['first']} | {t['last']} | {checked} |")
+    if minor:
+        lines += ["", f"<details><summary>Seen briefly and not yet checked: {len(minor)} more names</summary>", "",
+                  "The model's guesses for things it saw only briefly. Until a person confirms one, treat these as",
+                  "unverified: many will turn out to be a better-known fish seen at an odd angle.", "",
+                  "| Animal | Snapshots | First seen | Last seen |", "|---|---:|---|---|"]
+        lines += [f"| {name} | {t['seen']:,} | {t['first']} | {t['last']} |" for name, t in minor]
+        lines += ["", "</details>"]
 
     recent = [(date.fromisoformat(last) - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
     recent = [d for d in recent if d >= first]  # nothing to chart before tracking began

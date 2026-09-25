@@ -70,3 +70,20 @@ def test_review_answers_correct_the_logged_sighting(con):
     # the logged name is kept
     assert con.execute("SELECT common_name FROM sightings WHERE corrected_name = ''").fetchone()[0] == "market squid"
     assert db.apply_corrections(con) == 0  # running it again changes nothing
+
+
+def test_corrections_file_and_a_persons_answer_wins(con, tmp_path):
+    for t in ("13:34:01", "13:34:13", "15:10:00"):
+        db.record_snapshot(con, f"2026-09-25T{t}", False, [Sighting("diamond stingray")])
+    corrections = tmp_path / "corrections.csv"
+    corrections.write_text("from,to,logged_as,corrected_to,reviewer,reason\n"
+                           "2026-09-25T10:00:00,2026-09-25T14:50:00,diamond stingray,California spiny lobster,claude,antenna\n",
+                           encoding="utf-8")
+    con.executemany("INSERT INTO reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        ("x", "2026-09-25T13:34:13", "a.jpg", "check", "diamond stingray", "approved", "round stingray", "", 0.9, "person"),
+        ("x", "2026-09-25T13:34:13", "b.jpg", "check", "diamond stingray", "rejected", None, "", 0.9, "claude")])
+    db.apply_corrections(con, corrections)
+    got = dict(con.execute("SELECT taken_at, COALESCE(corrected_name, common_name) FROM sightings").fetchall())
+    assert got["2026-09-25T13:34:01"] == "California spiny lobster"   # from the file
+    assert got["2026-09-25T13:34:13"] == "round stingray"             # a person's answer beats Claude's and the file
+    assert got["2026-09-25T15:10:00"] == "diamond stingray"           # outside the window: untouched
