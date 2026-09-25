@@ -171,13 +171,20 @@ flowchart LR
    and the growth on them never move. The live test showed they are the main source of false sightings,
    so anything that didn't move is ignored.
    - **Fixed things that sway.** Some structure does move: growth hanging off the crossbeam and a round
-     growth on the right-hand piling sway in the surge, and the model named them with high confidence
-     ("leopard shark", "green sea turtle 100%"). So the tracker also keeps a **long-term background**:
-     the median of one clear frame every 5 minutes over the last hour. A passing animal isn't in it
-     (it's somewhere else in most of those frames), but everything fixed is. A crop that looks like the
-     same spot of the long-term background (correlation of 0.85 or more on a 32×32 grey copy, allowing
-     a little sway) is ignored as structure. An animal that stays in one place for half an hour or more
-     fades into the background too; its visit has been logged by then. See Validation, section 4.
+     growth on the right-hand piling sway in the surge (and the camera itself sways a little), and the
+     model named them with high confidence ("leopard shark", "green sea turtle 100%"). Two things tell
+     them apart from animals:
+     - a **long-term background**: the median of one clear frame every 5 minutes over the last hour.
+       Everything fixed is in it; a passing fish isn't. But neither is a lobster that has sat in its
+       crevice for half an hour, so this alone can't decide.
+     - a **gallery of what people confirmed**: every review picture marked "not an animal" (a fixture)
+       or approved as an animal, with where it was.
+
+     A crop that looks like a confirmed fixture at the same place (and like the background there) is
+     ignored. A crop that looks like the background at a place **nobody has confirmed** isn't logged:
+     it goes to the review queue, so a person decides whether it's swaying growth or a lobster sitting
+     still. Everything else is logged as usual. Each review answer makes the next decision automatic.
+     See Validation, section 4.
 5. **Fish.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
    (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) boxes fish above 0.35 confidence, and
    only boxes where something moved are kept.
@@ -479,18 +486,32 @@ of a big or unusual animal came from two fixed things swaying in the surge**:
 - a round growth on the right-hand piling, unchanged from 7:00 to at least 11:40, logged as sheep crab
   and green sea turtle (up to 100%).
 
-They moved enough to pass the motion check, and the model was sure of itself (90–100%). A rule of "same
-place, similar look, again later" wasn't safe: different real fish passing the same spot looked as much
-alike (up to 0.80) as a fixture did to itself (0.76–0.91). What does separate them is the long-term
-background (step 4 of "How the tracker finds and names animals"). On that day's 70 review pictures:
+They moved enough to pass the motion check, and the model was sure of itself (90–100%). What was tried:
+
+1. **"Same place, similar look, again later."** Not safe: different real fish passing the same spot
+   looked as much alike (up to 0.80) as a fixture did to itself (0.76–0.91).
+2. **The long-term background alone** (ignore a crop that matches it). On the first 68 review pictures:
+   16 of 17 fixtures caught, no real fish lost. Live, it let about a third of the fixtures through
+   (swaying and camera movement), and a lower cutoff would have hidden the resident kelp bass by the
+   round growth (up to 0.835). Worse, it **hid a real spiny lobster**: sitting in its crevice at the top
+   of the near piling, the lobster had become part of the background. A viewer saw its antennae at
+   12:21; the tracker had ignored it as structure, while the model called those very crops "California
+   spiny lobster" at 98–100%.
+3. **A gallery of crops the background check ignored.** Caught the swaying growth well, but took the
+   lobster in with it, for the same reason.
+4. **Person-confirmed structure only** (what runs now). Checked on the day's labeled review pictures,
+   each fixture compared only with the *other* confirmed ones:
 
 | | Ignored as structure |
 |---|---:|
-| Fixtures and empty water (17) | 16 |
-| Real fish (51) | **0** |
-| The spiny lobster that sat at the piling edge for over half an hour (2) | 2, after it had been logged |
+| Confirmed fixtures (22) | 21 |
+| Real fish (59), incl. the resident kelp bass | **0** |
+| The spiny lobster in its crevice (12:35) | **0**, logged |
 
-The one fixture missed was a half-visible crop at the edge of the frame.
+At places nobody has confirmed, anything that looks like the background goes to the review queue
+instead of being logged, so it's never silently hidden and never counted by mistake. The first day's
+fixture sightings (26 rows) were taken out of the database after checking each by eye; they're kept in
+`data/archive/fixtures-2026-09-25/` with the reason for each.
 
 ### 5. Ongoing hand-checks on live footage
 
@@ -736,6 +757,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
 | Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`). Each file is copied under a temporary name and swapped in, so an interrupted backup leaves the previous one whole, and a PC with less data than the backup (a fresh install that wasn't restored) never overwrites it |
 | `data/background.png` | The long-term background (median of the last hour of clear daylight) that fixed, swaying things are compared with |
+| `data/fixture_gallery.npz` | Person-confirmed fixtures and animals (from review answers), with where they were |
 | `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
 | `sandbox/piertracker_sandbox.db` | Your practice copy (`sql.py`, `.reset` to refresh) |

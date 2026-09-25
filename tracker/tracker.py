@@ -57,6 +57,8 @@ REVIEW = DATA / "review" / "pending"
 CAMERA_MODEL = MODELS / "camera_classifier.npz"
 BANK = DATA / "frame_bank"
 BACKGROUND_IMAGE = DATA / "background.png"
+FIXTURE_GALLERY = DATA / "fixture_gallery.npz"
+REVIEWED = {"rejected": DATA / "review" / "rejected", "approved": DATA / "review" / "approved"}
 
 POLL_SECONDS = 1
 REGULAR_SECONDS = 9          # frames closer together than this are burst frames (tracking only, not stats)
@@ -104,7 +106,18 @@ SCENE_MIN_MOTION = 0.15     # the whole frame is checked for a big animal when t
 BACKGROUND_EVERY = timedelta(minutes=5)  # one clear daylight frame every 5 minutes...
 BACKGROUND_FRAMES = 12                   # ...over the last hour; the background is their median
 BACKGROUND_MIN_FRAMES = 4
-FIXTURE_CORR = 0.85         # a crop this alike to the background at the same spot is structure
+# Structure, not an animal, when a crop looks like a person-confirmed fixture at the same place
+# (FixtureGallery) and like the long-term background: (gallery >=, background >=). Checked on
+# 2026-09-25's labeled review pictures, each fixture against the others: 21 of 22 fixtures, no real
+# fish (0 of 59), and the lobster in its crevice kept. The kelp bass by the round growth stays below.
+FIXTURE_LOOKS = ((0.75, -1.0), (0.65, 0.80), (0.60, 0.85))
+FIXTURE_SURE_CORR = 0.90    # at a confirmed fixture's place, this alike to the background: skip the model
+# Where nobody has confirmed what's there, a named crop this alike to the background could be swaying
+# structure or an animal sitting still (a lobster in its crevice): it isn't logged, a person decides
+# (review queue). Real fish passing by scored at most 0.835 on 2026-09-25.
+SUSPECT_CORR = 0.85
+ANIMAL_LOOKS = 0.75         # this alike to a confirmed animal at the same place: trusted, logged
+GALLERY_MAX = 3000
 CAMERA_MIN_PROB = 0.70      # the camera-trained classifier's answer is used when it's at least this sure
 REVIEW_FISH_PROB = 0.25     # an unidentified (big enough) fish whose best guess is at least this goes to review
 REVIEW_SCENE_PROB = 0.40    # a non-fish/big-animal guess between this and SCENE_MIN_PROB goes to review
@@ -483,18 +496,119 @@ class Background:
             self.median = Image.fromarray(np.median(np.stack(self.samples), axis=0).astype(np.uint8))
             self.median.save(BACKGROUND_IMAGE)
 
-    def is_fixture(self, img: Image.Image, box) -> bool:
-        """Does the square the classifier would see look like the background there? Allows two
-        pixels (of 32) of sway either way."""
+    def correlation(self, img: Image.Image, box) -> float:
+        """How much the square the classifier would see looks like the background there (-1..1),
+        allowing two pixels (of 32) of sway either way. -1 until there is a background."""
         if self.median is None:
-            return False
+            return -1.0
         x0, y0, x1, y1 = square_box(img, box)
         sx, sy = self.median.width / img.width, self.median.height / img.height
         now = np.asarray(img.crop((x0, y0, x1, y1)).convert("L").resize((36, 36), Image.BOX), np.float32)
         bg = np.asarray(self.median.crop((x0 * sx, y0 * sy, x1 * sx, y1 * sy)).resize((36, 36), Image.BOX), np.float32)
         now = standardize(now[2:34, 2:34])
-        best = max(float((now * standardize(bg[y:y + 32, x:x + 32])).mean()) for y in range(5) for x in range(5))
-        return best >= FIXTURE_CORR
+        return max(float((now * standardize(bg[y:y + 32, x:x + 32])).mean()) for y in range(5) for x in range(5))
+
+
+def overlap(a, b) -> float:
+    """Intersection over the smaller box's area."""
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    small = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+    return ix * iy / small if small > 0 else 0.0
+
+
+class FixtureGallery:
+    """Person-confirmed structure and animals, with where they were: the classifier's embeddings of
+    review pictures marked "not an animal" (fixtures) or approved as an animal. The hanging growth and
+    the round growth on the piling fool the model ("leopard shark", "green sea turtle 100%"), and the
+    long-term background alone can't tell them from an animal that sits still: a lobster in its
+    crevice becomes part of the background too. What a person has confirmed can. A crop is structure
+    when it looks like a confirmed fixture at the same place (FIXTURE_LOOKS) more than like any
+    confirmed animal there. Every review answer adds to it."""
+
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.boxes, self.embs, self.animal, self.sources = [], [], [], set()
+        try:
+            data = np.load(FIXTURE_GALLERY, allow_pickle=False)
+            if str(data["model"]) == model_name:
+                self.boxes = [tuple(float(v) for v in b) for b in data["boxes"]]
+                self.embs = list(data["embs"])
+                self.animal = [bool(a) for a in data["animal"]]
+                self.sources = set(str(x) for x in data["sources"])
+        except (OSError, KeyError, ValueError):
+            pass
+        self.add_reviewed()
+
+    def add(self, box, emb, animal: bool, source: str):
+        if source in self.sources:
+            return
+        self.sources.add(source)
+        self.boxes.append(tuple(float(v) for v in box[:4]))
+        self.embs.append(np.asarray(emb, np.float32) / np.linalg.norm(emb))
+        self.animal.append(animal)
+        if len(self.embs) > GALLERY_MAX:
+            del self.boxes[0], self.embs[0], self.animal[0]
+
+    def add_reviewed(self):
+        """New review answers: "not an animal" pictures are fixtures, approved ones animals."""
+        before = len(self.sources)
+        for decision, folder in REVIEWED.items():
+            for card in folder.glob("*.json") if folder.exists() else []:
+                if card.name in self.sources:
+                    continue
+                try:
+                    d = json.loads(card.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if d.get("embedding_model") == self.model_name and d.get("embedding") and d.get("box"):
+                    self.add(square_box(Image.new("L", (1920, 1080)), d["box"]), d["embedding"],
+                             animal=decision == "approved", source=card.name)
+        if len(self.sources) != before:
+            self.save()
+
+    def _near(self, img, box):
+        """Gallery entries covering more than 30% of this crop's square (a big crop that only clips a
+        fixture's place isn't at that place)."""
+        sq = square_box(img, box)
+        area = (sq[2] - sq[0]) * (sq[3] - sq[1])
+        near = []
+        for i, b in enumerate(self.boxes):
+            ix = max(0.0, min(sq[2], b[2]) - max(sq[0], b[0]))
+            iy = max(0.0, min(sq[3], b[3]) - max(sq[1], b[1]))
+            if area > 0 and ix * iy / area > 0.3:
+                near.append(i)
+        return near
+
+    def known_place(self, img: Image.Image, box) -> bool:
+        """Is there a confirmed fixture here?"""
+        return any(not self.animal[i] for i in self._near(img, box))
+
+    def similarity(self, img: Image.Image, box, emb):
+        """(closest confirmed fixture, closest confirmed animal) at this crop's place; 0 when none."""
+        e = np.asarray(emb, np.float32) / np.linalg.norm(emb)
+        fixture = animal = 0.0
+        for i in self._near(img, box):
+            sim = float(self.embs[i] @ e)
+            if self.animal[i]:
+                animal = max(animal, sim)
+            else:
+                fixture = max(fixture, sim)
+        return fixture, animal
+
+    def save(self):
+        FIXTURE_GALLERY.parent.mkdir(parents=True, exist_ok=True)
+        tmp = FIXTURE_GALLERY.with_name("fixture_gallery.tmp.npz")
+        dim = len(self.embs[0]) if self.embs else 1024
+        np.savez(tmp, model=self.model_name, boxes=np.array(self.boxes, np.float32).reshape(-1, 4),
+                 embs=np.array(self.embs, np.float32).reshape(-1, dim), animal=np.array(self.animal, bool),
+                 sources=np.array(sorted(self.sources), dtype=str))
+        os.replace(tmp, FIXTURE_GALLERY)
+
+
+def is_structure(similarity, background_corr: float) -> bool:
+    fixture, animal = similarity
+    return fixture > animal and any(fixture >= g and background_corr >= c for g, c in FIXTURE_LOOKS)
 
 
 class Tracker:
@@ -511,6 +625,7 @@ class Tracker:
         self.review_times = {"uncertain": deque(), "check": deque()}
         self.motion = Motion()
         self.background = Background()
+        self._gallery = None
         self.fixtures_ignored = 0
         self.murky = False
         self.recent_visibility = deque(maxlen=3)
@@ -563,7 +678,10 @@ class Tracker:
             return []  # still learning what the empty scene looks like
         if not poor:
             self.background.add(img, when)
+        self.record = None
         sightings = self._identify(img, when, poor)
+        if self.record and (self.record["ignored"] or self.record["named"]):
+            (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(self.record), encoding="utf-8")
         for s in sightings:
             seen = self.hour["species"].setdefault(s.common, [0, 0])
             seen[0] += 1
@@ -599,9 +717,10 @@ class Tracker:
         fish_boxes = [b for b in m.detect(img)
                       if min(b[2] - b[0], b[3] - b[1]) >= MIN_CROP_PX and self.motion.fraction(b) >= BOX_MIN_MOTION]
         # ...and the growth hanging there, which does move (it sways) but is part of the background.
-        fixtures = [b for b in fish_boxes
-                    if max(b[2] - b[0], b[3] - b[1]) >= MIN_NAME_PX and self.background.is_fixture(img, b)]
+        corr = {id(b): self.background.correlation(img, b) for b in fish_boxes if max(b[2] - b[0], b[3] - b[1]) >= MIN_NAME_PX}
+        fixtures = [b for b in fish_boxes if corr.get(id(b), -1) >= FIXTURE_SURE_CORR and self.gallery().known_place(img, b)]
         fish_boxes = [b for b in fish_boxes if b not in fixtures]
+        self.record = record = {"ignored": [], "named": []}  # for frames/underwater/recent, with the scores
 
         # 1. Everything that isn't a fish the detector found (octopus, crabs, lobsters, jellies, sea
         #    lions, rays, divers...): look at what moved. Each moving area bigger than a small fish,
@@ -610,19 +729,26 @@ class Tracker:
         #    the review queue.
         full = (0, 0, img.width, img.height)
         views = [b for b in self.motion.blobs(BLOB_MIN_PX) if all(iou(b, f) < 0.3 for f in fish_boxes + fixtures)]
-        swaying = [b for b in views[:MAX_BLOBS] if self.background.is_fixture(img, b)]
-        self.fixtures_ignored = len(fixtures) + len(swaying)
-        if fixtures or swaying:
-            (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(
-                {"ignored_fish_boxes": [[round(v) for v in b[:4]] for b in fixtures],
-                 "ignored_moving_areas": [[round(v) for v in b[:4]] for b in swaying]}), encoding="utf-8")
-        views = [b for b in views[:MAX_BLOBS] if b not in swaying]
+        views = views[:MAX_BLOBS]
+        corr.update({id(b): self.background.correlation(img, b) for b in views})
+        swaying = [b for b in views if corr[id(b)] >= FIXTURE_SURE_CORR and self.gallery().known_place(img, b)]
+        views = [b for b in views if b not in swaying]
+        sure = fixtures + swaying
+        record["ignored"] += [{"box": [round(v) for v in b[:4]], "background": round(corr[id(b)], 3)} for b in sure]
+        self.fixtures_ignored = len(sure)
         views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION else []
         whole_frame_animal = None
         for box in views:
             view = img if box == full else square_crop(img, box)
             emb = m.embed(view)
+            verdict = "ok" if box == full else self._structure_check(img, box, emb, corr[id(box)], record)
+            if verdict == "structure":
+                continue
             probs = m.probabilities(emb)
+            if verdict == "suspect":
+                if not m.labels[int(probs.argmax())]["negative"]:
+                    queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                continue
             label, prob = m.name(probs, None, scene_cut)
             if label is None:
                 best = int(probs.argmax())
@@ -663,10 +789,18 @@ class Tracker:
                 continue
             crop = square_crop(img, box)
             emb = m.embed(crop)
+            verdict = self._structure_check(img, box, emb, corr.get(id(box), -1), record)
+            if verdict == "structure":
+                continue
             probs = m.probabilities(emb, m.fish_idx)
             best = int(probs.argmax())
             if m.labels[m.fish_idx[best]]["negative"] and probs[best] >= NEGATIVE_MIN_PROB:
                 continue  # murk, kelp or piling, not an animal
+            if verdict == "suspect":
+                guesses = top_guesses(m.labels, probs, m.fish_idx)
+                if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
+                    queue(crop, img, box[:4], guesses, when, embedding=emb)
+                continue
             camera = m.camera_name(emb)
             if camera and camera[0] == "not an animal":
                 continue  # learned from people's answers: this kind of thing isn't an animal
@@ -736,10 +870,15 @@ class Tracker:
         m = self.models()
         self.motion.peek(img)
         for box in m.detect(img):
-            if (max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION
-                    or self.background.is_fixture(img, box)):
+            if max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION:
                 continue
-            probs = m.probabilities(m.embed(square_crop(img, box)), m.fish_idx)
+            c = self.background.correlation(img, box)
+            if c >= FIXTURE_SURE_CORR and self.gallery().known_place(img, box):
+                continue
+            emb = m.embed(square_crop(img, box))
+            if self._structure_check(img, box, emb, c, {"ignored": [], "named": []}) != "ok":
+                continue
+            probs = m.probabilities(emb, m.fish_idx)
             if any(t.near(box) and when - t.last_seen <= TRACK_GAP for t in self.tracks):
                 self._follow(box, probs, when)
 
@@ -810,6 +949,29 @@ class Tracker:
             gc.collect()
             log.info("models unloaded (idle)")
 
+    def gallery(self) -> "FixtureGallery":
+        if self._gallery is None:
+            self._gallery = FixtureGallery(self.models().embedding_model)
+        return self._gallery
+
+    def _structure_check(self, img, box, emb, background_corr, record) -> str:
+        """"structure": looks like a confirmed fixture here, ignore it. "suspect": as alike to the
+        background as structure, but nobody has confirmed what's here, so a person decides (not
+        logged). "ok": log it."""
+        like_fixture, like_animal = self.gallery().similarity(img, box, emb)
+        if is_structure((like_fixture, like_animal), background_corr):
+            verdict = "structure"
+        elif background_corr >= SUSPECT_CORR and not (like_animal >= ANIMAL_LOOKS and like_animal > like_fixture):
+            verdict = "suspect"
+        else:
+            verdict = "ok"
+        record["ignored" if verdict == "structure" else "named"].append(
+            {"box": [round(v) for v in box[:4]], "background": round(background_corr, 3),
+             "like_fixture": round(like_fixture, 3), "like_animal": round(like_animal, 3), "verdict": verdict})
+        if verdict == "structure":
+            self.fixtures_ignored += 1
+        return verdict
+
     @staticmethod
     def _keep_recent(img: Image.Image, when: datetime):
         """Keeps this frame for 10 minutes (daylight only), dropping older ones."""
@@ -873,6 +1035,8 @@ class Tracker:
                 subprocess.Popen(args, cwd=ROOT, creationflags=flags)
             log.info("new day: nightly job started")
         self.hour = self._new_hour(when)
+        if self._gallery is not None:
+            self._gallery.add_reviewed()  # new answers from the review window
         if when - self.last_prune > timedelta(hours=6):
             self.last_prune = when
             self._prune_crops(when)
@@ -885,6 +1049,8 @@ class Tracker:
 
     def close(self):
         self._save_hour()
+        if self._gallery is not None:
+            self._gallery.save()
         self.db.close()
 
     @staticmethod
