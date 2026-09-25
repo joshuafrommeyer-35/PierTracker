@@ -21,7 +21,10 @@ These are built and switch themselves on; they only need time or answers.
 ## Needs a person
 
 - **Review queue**: especially the "ocean whitefish" cards (likely juvenile blacksmith) and the cards of
-  the hanging growth and the round growth on the piling ("not an animal").
+  the hanging growth and the round growth on the piling ("not an animal"). Every answer now also teaches
+  the fixture check (the gallery of confirmed fixtures and animals): "not an animal" on piling-edge
+  cards stops them from coming back, and approving the lobster lets it be logged even while it sits
+  still in its crevice.
 - **SQL walkthrough** in the sandbox ([`SQL_WALKTHROUGH.md`](SQL_WALKTHROUGH.md)).
 
 ## To watch
