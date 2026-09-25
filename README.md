@@ -18,7 +18,83 @@ See [Performance](#performance).
 ## Tracking results
 
 <!-- RESULTS:START -->
-_No results yet. The tracker publishes here once a day after it starts running._
+_Last updated 2026-09-25 11:08 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-25 11:07:42.
+
+| | |
+|---|---|
+| Days tracked | 1 |
+| Snapshots analyzed (one every 10 s while streaming) | 250 |
+| Clear-water daylight footage analyzed | 0.7 h |
+| Daylight too murky to identify anything | 0.0 h |
+| Animal types seen | 16 |
+
+### Animals seen
+
+"Snapshots" counts snapshots the animal was in, not individual animals: a fish that hangs around
+for a minute shows up in about six snapshots. "Most at once" is the biggest count in one snapshot.
+Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish
+(too small to name) the count is a rough estimate from the moving specks, rounded.
+
+Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many
+of its names a person has looked at so far, and how many were right.
+
+| Animal | Type | Snapshots | % of clear-water snapshots | Most at once | Days seen | First seen | Last seen | Checked |
+|---|---|---:|---:|---:|---:|---|---|---|
+| small fish (school) | fish | 177 | 70.80% | 600 | 1 | 2026-09-25 | 2026-09-25 | — |
+| blacksmith | fish | 69 | 27.60% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| fish (unidentified) | fish | 51 | 20.40% | 4 | 1 | 2026-09-25 | 2026-09-25 | — |
+| silversides & sardines |  | 9 | 3.60% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| blacksmith (school) | fish | 8 | 3.20% | 8 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| salema | fish | 8 | 3.20% | 3 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| Pacific sardine | fish | 6 | 2.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| ocean whitefish |  | 4 | 1.60% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| giant sea bass | fish | 3 | 1.20% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| jacksmelt | fish | 3 | 1.20% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| barred sand bass | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| garibaldi | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| giant kelpfish | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| halfmoon | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| sheep crab | invertebrate | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| shovelnose guitarfish | shark/ray | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| silversides & sardines (school) |  | 1 | 0.40% | 5 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+
+### Sightings per day (up to the last 14 days)
+
+```mermaid
+xychart-beta
+    x-axis ["09-25"]
+    y-axis "Animal snapshots"
+    bar [345]
+```
+
+### When animals show up (all days, Pacific time)
+
+```mermaid
+xychart-beta
+    x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    y-axis "Animal snapshots"
+    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+```
+
+Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: [what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the [camera-trained classifier](results/camera_classifier.md) (trained from the review answers).
+
+### Conditions at the pier
+
+**2026-09-25:** water 22.9 °C at ~5 m, **+2.8 °C** vs. normal for the date. Turbidity 0.24 NTU, chlorophyll 0.42 µg/L. El Niño index **+1.8** (El Niño).
+
+<details><summary>Daily conditions, last 14 days</summary>
+
+| Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2026-09-25 | 22.9 | +2.8 | 0.24 | 0.42 | 33.46 | 7.16 | 7.97 | 1.49 | 345 |
+
+Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
+
+</details>
+
+### Validation (hand-checked samples)
+
+_No names have been checked by a person yet, so treat the names above as unverified model guesses._
 <!-- RESULTS:END -->
 
 ## How it works
