@@ -1,8 +1,12 @@
 """What brings animals in? Relates hourly sightings to the conditions at the pier.
 
-For each animal with enough sightings, this fits a negative binomial regression (suited to counts
-that come in bursts) of how many snapshots per daylight hour the animal was in, using the
-hour's daylight snapshots as exposure, against:
+For each animal with enough sightings, this fits a logistic regression of whether the animal was
+seen at all in each clear daylight hour (yes/no), against the conditions below. Yes/no per hour,
+not snapshot counts: the tracker can't tell individuals apart, and one kelp bass hanging around
+the camera for an hour would otherwise look like hundreds of sightings. How much clear footage the
+hour had (effort) is a predictor too, since more looking finds more.
+
+The conditions:
 
   - how much warmer or colder than normal the water is (pier temperature anomaly; the El Nino
     signal at the pier),
@@ -16,7 +20,7 @@ results/conditions_model.md with rate ratios and 95% intervals, or how much data
 needed. Run by nightly.py once a day, or by hand:
     tracker\\.venv\\Scripts\\python tracker\\ml\\conditions_model.py
 
-Caveats: it shows associations, not causes, and hours aren't independent (a school that
+Caveats: it shows associations, not causes, and hours aren't fully independent (a fish that
 lingers shows up in neighbouring hours), so the intervals are optimistic. Occupancy models and
 GAMs are the natural next steps once there's a season of data.
 """
@@ -72,8 +76,9 @@ def fit(table, animal):
         usable.remove("oni")  # the index barely changed over this data: nothing to learn from it yet
     data = table.dropna(subset=usable)
     X = (data[usable] - data[usable].mean()) / data[usable].std()
-    # NB2 with the overdispersion estimated from the data (animal counts are very bursty).
-    model = sm.NegativeBinomial(data[animal], sm.add_constant(X), exposure=data["daylight"]).fit(disp=0, maxiter=200)
+    seen = (data[animal] > 0).astype(int)
+    X = sm.add_constant(X.assign(log_effort=np.log(data["daylight"])))
+    model = sm.Logit(seen, X).fit(disp=0, maxiter=200)
     ci = model.conf_int()
     rows = []
     for p in usable:
@@ -91,10 +96,11 @@ def main():
         if days < MIN_DAYS:
             lines.append(f"Waiting for data: {days} of the {MIN_DAYS} days needed before fitting models.")
         else:
-            lines += ["Negative binomial regressions of snapshots per daylight hour. A **rate ratio** of 1.5 means "
-                      "the animal is seen 1.5x as often per typical (1 SD) increase in that condition; below 1, "
-                      "less often. Associations, not causes; intervals are optimistic because neighbouring "
-                      "hours aren't independent.", ""]
+            lines += ["Logistic regressions of whether the animal was seen in a clear daylight hour (yes/no), so "
+                      "a fish that lingers counts once per hour, not once per snapshot. An **odds ratio** of 1.5 "
+                      "means the odds of seeing it in an hour are 1.5x higher per typical (1 SD) increase in "
+                      "that condition; below 1, lower. Associations, not causes; intervals are optimistic "
+                      "because neighbouring hours aren't independent.", ""]
             for animal in animals:
                 hours_seen = int((table[animal] > 0).sum())
                 if hours_seen < MIN_HOURS_SEEN:
@@ -105,7 +111,7 @@ def main():
                     lines += [f"## {animal}", "", f"_Model didn't fit: {e}_", ""]
                     continue
                 lines += [f"## {animal}", "", f"{hours_seen} hours with sightings, {n} daylight hours modeled.", "",
-                          "| Condition | Rate ratio | 95% interval | p |", "|---|---:|---|---:|"]
+                          "| Condition | Odds ratio | 95% interval | p |", "|---|---:|---|---:|"]
                 lines += [f"| {name} | {rr:.2f} | {lo:.2f}-{hi:.2f} | {p:.3f} |" for name, rr, lo, hi, p in rows]
                 lines.append("")
             waiting = [a for a in animals if int((table[a] > 0).sum()) < MIN_HOURS_SEEN]

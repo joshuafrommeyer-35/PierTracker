@@ -6,13 +6,23 @@ date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,snapshot
 2026-09-25,10,250,0,0,fish (unidentified),51,4
 2026-09-25,10,250,0,0,garibaldi,1,1
 2026-09-25,10,250,0,0,giant kelpfish,1,1
-2026-09-25,10,250,0,0,giant sea bass,3,1
 2026-09-25,10,250,0,0,halfmoon,1,1
 2026-09-25,10,250,0,0,jacksmelt,3,2
 2026-09-25,10,250,0,0,ocean whitefish,4,2
 2026-09-25,10,250,0,0,salema,8,3
-2026-09-25,10,250,0,0,sheep crab,1,1
-2026-09-25,10,250,0,0,shovelnose guitarfish,1,1
 2026-09-25,10,250,0,0,silversides & sardines,9,4
 2026-09-25,10,250,0,0,silversides & sardines (school),1,5
 2026-09-25,10,250,0,0,small fish (school),177,600
+2026-09-25,11,291,0,0,blacksmith,62,4
+2026-09-25,11,291,0,0,blacksmith (school),12,9
+2026-09-25,11,291,0,0,bullseye pufferfish,1,1
+2026-09-25,11,291,0,0,croakers,1,1
+2026-09-25,11,291,0,0,"damselfishes (garibaldi, blacksmith)",1,1
+2026-09-25,11,291,0,0,fish (unidentified),47,3
+2026-09-25,11,291,0,0,giant kelpfish,1,1
+2026-09-25,11,291,0,0,kelp bass,15,1
+2026-09-25,11,291,0,0,mackerels & bonito,1,1
+2026-09-25,11,291,0,0,market squid,1,1
+2026-09-25,11,291,0,0,salema,1,1
+2026-09-25,11,291,0,0,silversides & sardines,1,1
+2026-09-25,11,291,0,0,small fish (school),227,400

@@ -25,6 +25,7 @@ import environment
 
 ROOT = Path(__file__).resolve().parent.parent
 HOURLY_CSV = ROOT / "data" / "hourly_summary.csv"
+SIGHTINGS_CSV = ROOT / "data" / "sightings.csv"
 RESULTS = ROOT / "results"
 DAILY_CSV = RESULTS / "daily_summary.csv"
 VALIDATION_CSV = RESULTS / "validation.csv"
@@ -37,6 +38,10 @@ README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
 SNAPSHOT_SECONDS = 10  # LiveCams saves a frame this often (captureEverySeconds)
+# Sightings of the same animal closer together than this are one encounter: the usual camera-trap
+# rule for "independent detections" (results were found stable between 5 and 60 minutes).
+ENCOUNTER_GAP = timedelta(minutes=30)
+NO_ENCOUNTERS = ("small fish", "small fish (school)", "fish (unidentified)")  # a mix of kinds, not one animal
 NO_WINDOW = 0x08000000
 
 
@@ -57,9 +62,30 @@ def load_hourly():
     return effort, species
 
 
+def load_encounters(effort):
+    """Encounters (independent detections) per (date, animal) from the per-snapshot sightings: a
+    sighting starts a new encounter only if that animal wasn't seen in the previous 30 minutes. So
+    a kelp bass that hangs around the camera for an hour is one encounter, not 360 snapshots. Only
+    hours already in the hourly summary count, so this matches the rest of the numbers."""
+    times = defaultdict(list)
+    if SIGHTINGS_CSV.exists():
+        with SIGHTINGS_CSV.open(encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                times[row["common_name"]].append(datetime.fromisoformat(row["timestamp"]))
+    encounters = defaultdict(int)
+    for name, stamps in times.items():
+        last = None
+        for t in sorted(stamps):
+            if (last is None or t - last >= ENCOUNTER_GAP) and (t.date().isoformat(), t.hour) in effort:
+                encounters[(t.date().isoformat(), name)] += 1
+            last = t
+    return encounters
+
+
 def categories():
     spec = json.loads(SPECIES.read_text(encoding="utf-8"))
     cats = {s["common"]: s["category"] for s in spec["species"]}
+    cats.update({s["group"]: s["category"] for s in spec["species"] if s.get("group")})  # look-alike groups
     cats["fish (unidentified)"] = cats["small fish"] = "fish"
     return cats
 
@@ -155,17 +181,18 @@ def build(effort, species):
     return days, by_hour_of_day
 
 
-def write_daily(days):
+def write_daily(days, encounters):
     RESULTS.mkdir(exist_ok=True)
     with DAILY_CSV.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name", "snapshots_seen",
-                    "max_count"])
+        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name", "encounters",
+                    "snapshots_seen", "max_count"])
         for d in sorted(days):
             day = days[d]
             rows = sorted(day["species"].items()) or [("", [0, 0])]
             for name, (seen, most) in rows:
-                w.writerow([d, day["analyzed"], day["dark"], day["murky"], name, seen, most])
+                n = "" if not name or name in NO_ENCOUNTERS else encounters.get((d, name), 0)
+                w.writerow([d, day["analyzed"], day["dark"], day["murky"], name, n, seen, most])
 
 
 def render_validation(validation):
@@ -323,7 +350,7 @@ def render_confirmed(confirmed, rejected):
     return lines
 
 
-def render(days, by_hour_of_day, validation, confirmed, rejected, conditions):
+def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, encounters):
     if not days:
         return "_No results yet. The tracker publishes here once a day after it starts running._"
     cats = categories()
@@ -332,10 +359,11 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions):
     daylight = sum(d["analyzed"] - d["dark"] - d["murky"] for d in days.values())  # clear-water daylight
     murky = sum(d["murky"] for d in days.values())
 
-    totals = defaultdict(lambda: {"days": 0, "seen": 0, "max": 0, "first": None, "last": None})
+    totals = defaultdict(lambda: {"days": 0, "seen": 0, "max": 0, "first": None, "last": None, "encounters": 0})
     for d in sorted(days):
         for name, (seen, most) in days[d]["species"].items():
             t = totals[name]
+            t["encounters"] += encounters.get((d, name), 0)
             t["days"] += 1
             t["seen"] += seen
             t["max"] = max(t["max"], most)
@@ -355,23 +383,30 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions):
         "",
         "### Animals seen",
         "",
-        "\"Snapshots\" counts snapshots the animal was in, not individual animals: a fish that hangs around",
-        "for a minute shows up in about six snapshots. \"Most at once\" is the biggest count in one snapshot.",
+        "The tracker can't tell individual fish apart, so none of these numbers count individuals:",
+        "- **Encounters**: sightings of the same animal less than 30 minutes apart are one encounter (the",
+        "  usual camera-trap rule for independent detections). A kelp bass that hangs around the camera for",
+        "  an hour is one encounter. Two encounters can still be the same fish coming back.",
+        "- **Snapshots**: how many snapshots (one every 10 s) it was in, i.e. how long it was around.",
+        "- **Most at once (MaxN)**: the most seen in a single snapshot, the standard count for underwater",
+        "  video because no fish can be counted twice. It undercounts big schools.",
+        "",
         "Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish",
         "(too small to name) the count is a rough estimate from the moving specks, rounded.",
         "",
         "Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many",
         "of its names a person has looked at so far, and how many were right.",
         "",
-        "| Animal | Type | Snapshots | % of clear-water snapshots | Most at once | Days seen | First seen | Last seen | Checked |",
-        "|---|---|---:|---:|---:|---:|---|---|---|",
+        "| Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |",
+        "|---|---|---:|---:|---:|---:|---:|---|---|---|",
     ]
     for name, t in sorted(totals.items(), key=lambda kv: -kv[1]["seen"]):
         pct = 100 * t["seen"] / daylight if daylight else 0
         base = base_name(name)
         r, w = validation.get(base, (0, 0))
         checked = "—" if base in ("fish (unidentified)", "small fish") else f"{r - w} of {r} right" if r else "not yet"
-        lines.append(f"| {name} | {cats.get(base, '')} | {t['seen']:,} | {pct:.2f}% | {t['max']} | "
+        enc = "—" if name in NO_ENCOUNTERS else f"{t['encounters']:,}"
+        lines.append(f"| {name} | {cats.get(base, '')} | {enc} | {t['seen']:,} | {pct:.2f}% | {t['max']} | "
                      f"{t['days']} | {t['first']} | {t['last']} | {checked} |")
 
     recent = [(date.fromisoformat(last) - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
@@ -440,7 +475,8 @@ def main(push=True, update_environment=True):
     publish_hourly(first_day)
     if CLASSIFIER_REPORT.exists():
         shutil.copyfile(CLASSIFIER_REPORT, RESULTS / "camera_classifier.md")
-    write_daily(days)
+    encounters = load_encounters(effort)
+    write_daily(days, encounters)
     validation = update_validation()
     confirmed, rejected, checks = read_reviews()
     for name, (checked, wrong) in checks.items():  # review-window checks count as validation too
@@ -448,7 +484,7 @@ def main(push=True, update_environment=True):
         validation[name][1] += wrong
     conditions = daily_conditions(days, load_environment())
     write_daily_conditions(conditions)
-    update_readme(render(days, by_hour, validation, confirmed, rejected, conditions))
+    update_readme(render(days, by_hour, validation, confirmed, rejected, conditions, encounters))
     if not push:
         return
     git("add", "README.md", "results")

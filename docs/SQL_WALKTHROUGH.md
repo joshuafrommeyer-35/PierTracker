@@ -233,6 +233,27 @@ SELECT * FROM (
 ) WHERE rnk = 1;
 ```
 
+`LAG` looks at the previous row. The results table's **Encounters** column is built this way: a
+sighting starts a new encounter only if the same animal wasn't seen in the previous 30 minutes, so one
+kelp bass hanging around for an hour counts once.
+
+```sql
+WITH gaps AS (
+    SELECT common_name, taken_at,
+           (julianday(taken_at) - julianday(LAG(taken_at) OVER (PARTITION BY common_name ORDER BY taken_at)))
+               * 24 * 60 AS minutes_since_last
+    FROM sightings
+)
+SELECT common_name, COUNT(*) AS encounters
+FROM gaps
+WHERE minutes_since_last IS NULL OR minutes_since_last >= 30
+GROUP BY common_name
+ORDER BY encounters DESC;
+```
+
+**Try:** change 30 to 5 and to 60. Camera-trap studies found the rule gives stable results anywhere in
+that range. Does it here?
+
 ## Lesson 8: your own question
 
 Some to try once there are a few weeks of data:

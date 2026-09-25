@@ -18,45 +18,54 @@ See [Performance](#performance).
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-09-25 11:08 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-25 11:07:42.
+_Last updated 2026-09-25 12:03 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-25 12:03:09.
 
 | | |
 |---|---|
 | Days tracked | 1 |
-| Snapshots analyzed (one every 10 s while streaming) | 250 |
-| Clear-water daylight footage analyzed | 0.7 h |
+| Snapshots analyzed (one every 10 s while streaming) | 541 |
+| Clear-water daylight footage analyzed | 1.5 h |
 | Daylight too murky to identify anything | 0.0 h |
-| Animal types seen | 16 |
+| Animal types seen | 19 |
 
 ### Animals seen
 
-"Snapshots" counts snapshots the animal was in, not individual animals: a fish that hangs around
-for a minute shows up in about six snapshots. "Most at once" is the biggest count in one snapshot.
+The tracker can't tell individual fish apart, so none of these numbers count individuals:
+- **Encounters**: sightings of the same animal less than 30 minutes apart are one encounter (the
+  usual camera-trap rule for independent detections). A kelp bass that hangs around the camera for
+  an hour is one encounter. Two encounters can still be the same fish coming back.
+- **Snapshots**: how many snapshots (one every 10 s) it was in, i.e. how long it was around.
+- **Most at once (MaxN)**: the most seen in a single snapshot, the standard count for underwater
+  video because no fish can be counted twice. It undercounts big schools.
+
 Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish
 (too small to name) the count is a rough estimate from the moving specks, rounded.
 
 Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many
 of its names a person has looked at so far, and how many were right.
 
-| Animal | Type | Snapshots | % of clear-water snapshots | Most at once | Days seen | First seen | Last seen | Checked |
-|---|---|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | 177 | 70.80% | 600 | 1 | 2026-09-25 | 2026-09-25 | — |
-| blacksmith | fish | 69 | 27.60% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| fish (unidentified) | fish | 51 | 20.40% | 4 | 1 | 2026-09-25 | 2026-09-25 | — |
-| silversides & sardines |  | 9 | 3.60% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| blacksmith (school) | fish | 8 | 3.20% | 8 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| salema | fish | 8 | 3.20% | 3 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| Pacific sardine | fish | 6 | 2.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| ocean whitefish |  | 4 | 1.60% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| giant sea bass | fish | 3 | 1.20% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| jacksmelt | fish | 3 | 1.20% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| barred sand bass | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| garibaldi | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| giant kelpfish | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| halfmoon | fish | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| sheep crab | invertebrate | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| shovelnose guitarfish | shark/ray | 1 | 0.40% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
-| silversides & sardines (school) |  | 1 | 0.40% | 5 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
+|---|---|---:|---:|---:|---:|---:|---|---|---|
+| small fish (school) | fish | — | 404 | 74.68% | 600 | 1 | 2026-09-25 | 2026-09-25 | — |
+| blacksmith | fish | 1 | 131 | 24.21% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| fish (unidentified) | fish | — | 98 | 18.11% | 4 | 1 | 2026-09-25 | 2026-09-25 | — |
+| blacksmith (school) | fish | 2 | 20 | 3.70% | 9 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| kelp bass | fish | 1 | 15 | 2.77% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| silversides & sardines |  | 1 | 10 | 1.85% | 4 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| salema | fish | 2 | 9 | 1.66% | 3 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| Pacific sardine | fish | 1 | 6 | 1.11% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| ocean whitefish |  | 1 | 4 | 0.74% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| jacksmelt | fish | 2 | 3 | 0.55% | 2 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| giant kelpfish | fish | 2 | 2 | 0.37% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| barred sand bass | fish | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| garibaldi | fish | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| halfmoon | fish | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| silversides & sardines (school) |  | 1 | 1 | 0.18% | 5 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| bullseye pufferfish | fish | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| croakers |  | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| damselfishes (garibaldi, blacksmith) |  | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| mackerels & bonito |  | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
+| market squid | invertebrate | 1 | 1 | 0.18% | 1 | 1 | 2026-09-25 | 2026-09-25 | not yet |
 
 ### Sightings per day (up to the last 14 days)
 
@@ -64,7 +73,7 @@ of its names a person has looked at so far, and how many were right.
 xychart-beta
     x-axis ["09-25"]
     y-axis "Animal snapshots"
-    bar [345]
+    bar [711]
 ```
 
 ### When animals show up (all days, Pacific time)
@@ -73,7 +82,7 @@ xychart-beta
 xychart-beta
     x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 345, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 340, 371, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
 Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: [what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the [camera-trained classifier](results/camera_classifier.md) (trained from the review answers).
@@ -86,7 +95,7 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 2026-09-25 | 22.9 | +2.8 | 0.24 | 0.42 | 33.46 | 7.16 | 7.97 | 1.49 | 345 |
+| 2026-09-25 | 22.9 | +2.8 | 0.24 | 0.42 | 33.46 | 7.16 | 7.97 | 1.49 | 711 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
@@ -557,19 +566,29 @@ image embedding (1,024 numbers describing the picture), and your answer is its l
 
 ### What brings animals in (`tracker/ml/conditions_model.py`)
 
-For each animal seen in 30+ hours, this fits a negative binomial regression (counts that come in bursts)
-of snapshots per daylight hour, with the hour's daylight snapshots as exposure. The predictors are:
+For each animal seen in 30+ hours, this fits a logistic regression of **whether it was seen at all in
+each clear daylight hour** (yes/no), with that hour's amount of clear footage as a predictor (more
+looking finds more). Yes/no per hour rather than snapshot counts, because the tracker can't tell
+individuals apart: one kelp bass that hangs around the camera for an hour would otherwise look like
+hundreds of sightings. The other predictors are:
 - how much warmer than normal the water is (the local El Niño signal)
 - turbidity and chlorophyll
 - tide height, and whether it's rising
 - time of day
 - the El Niño index, once the data spans months where it changes
 
-Results are rate ratios per typical (1 SD) change with 95% intervals, in
+Results are odds ratios per typical (1 SD) change with 95% intervals, in
 [`results/conditions_model.md`](results/conditions_model.md). It starts after **21 days** of data.
 
-- **Tested:** on synthetic data with a planted "1.6× more sightings per SD of warmer water" effect, it
-  recovered 1.71× (95% CI 1.56–1.87) and correctly found no effect for the other conditions.
+- **Tested** on 20 synthetic data sets with two made-up animals: one really shows up more in warm water
+  (odds × 2.0 per SD), the other shows up just as often but **lingers longer** when it's warm.
+
+  | | Old model (snapshot counts) | This model (seen in the hour, yes/no) |
+  |---|---|---|
+  | Shows up more when warm (truth 2.0) | underestimated | median 2.24; interval covered 2.0 in 18/20 |
+  | Only lingers longer (truth: no effect) | "effect" found in **20/20** (median 1.79) | "effect" found in 1/20, the expected 5% (median 1.01) |
+
+  The first version counted snapshots and would have reported that lingering fish "like warm water".
 - **Caveats:** it shows associations, not causes. Neighbouring hours aren't independent, so the intervals
   are optimistic.
 
