@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 LIVECAMS = Path(__file__).resolve().parent.parent
@@ -31,7 +32,8 @@ def backup(target: Path):
     # synced folders don't like SQLite writing to them directly.
     with tempfile.TemporaryDirectory() as tmp:
         copy_path = Path(tmp) / "piertracker.db"
-        with db.connect() as live, sqlite3.connect(copy_path) as copy:
+        # closing(): sqlite3's own "with" commits but doesn't close, which leaves the file locked on Windows
+        with closing(db.connect()) as live, closing(sqlite3.connect(copy_path)) as copy:
             live.backup(copy)
         shutil.copy2(copy_path, target / "piertracker.db")
     for csv_file in data.glob("*.csv"):

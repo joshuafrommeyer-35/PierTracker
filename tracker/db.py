@@ -25,6 +25,7 @@ import json
 import shutil
 import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
 
 TRACKER = Path(__file__).resolve().parent
@@ -172,7 +173,7 @@ def backfill_sightings(con: sqlite3.Connection):
 def make_sandbox():
     """A copy to practice on: break it freely, then run this again for a fresh one."""
     SANDBOX.parent.mkdir(parents=True, exist_ok=True)
-    with connect() as live, sqlite3.connect(SANDBOX) as copy:
+    with closing(connect()) as live, closing(sqlite3.connect(SANDBOX)) as copy:
         live.backup(copy)  # a consistent copy even while the tracker is writing
     return SANDBOX
 
