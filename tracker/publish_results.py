@@ -1,7 +1,9 @@
 """Publishes the tracker's summary stats to the project's GitHub repo.
 
-Rolls data/hourly_summary.csv up into results/daily_summary.csv, rewrites the
-"Tracking results" section of README.md, and commits and pushes if anything
+Fetches the day's conditions at the pier (environment.py), rolls data/hourly_summary.csv up
+into results/daily_summary.csv, publishes the hourly sightings and conditions side by side
+(results/hourly_summary.csv, results/environment_hourly.csv; they join on date + hour),
+rewrites the "Tracking results" section of README.md, and commits and pushes if anything
 changed. The tracker runs this once a day when started with --publish; you can
 also run it by hand. Only summaries are published: the raw per-snapshot
 sightings and the cam images stay on this PC.
@@ -9,12 +11,17 @@ sightings and the cam images stay on this PC.
 
 import csv
 import json
+import logging
 import re
+import shutil
+import statistics
 import subprocess
 import sys
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
+import environment
 
 ROOT = Path(__file__).resolve().parent.parent
 HOURLY_CSV = ROOT / "data" / "hourly_summary.csv"
@@ -24,6 +31,7 @@ VALIDATION_CSV = RESULTS / "validation.csv"
 CROPS = ROOT / "data" / "crops"
 DECISIONS_CSV = ROOT / "data" / "review" / "decisions.csv"
 CONFIRMED_CSV = RESULTS / "confirmed_by_hand.csv"
+ENV_CSV = environment.ENV_CSV
 README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
@@ -50,8 +58,13 @@ def load_hourly():
 def categories():
     spec = json.loads(SPECIES.read_text(encoding="utf-8"))
     cats = {s["common"]: s["category"] for s in spec["species"]}
-    cats["fish (unidentified)"] = "fish"
+    cats["fish (unidentified)"] = cats["small fish"] = "fish"
     return cats
+
+
+def base_name(name):
+    """ "blacksmith (school)" -> "blacksmith" """
+    return name.removesuffix(" (school)")
 
 
 def file_safe(name):
@@ -93,16 +106,24 @@ def update_validation():
     return totals
 
 
-def update_confirmed():
-    """Uncertain sightings a person reviewed (the LiveCams review window writes
-    data/review/decisions.csv). Publishes a copy without file names and returns
-    ({animal: [times confirmed, last date]}, number rejected)."""
-    confirmed, rejected, rows = defaultdict(lambda: [0, ""]), 0, []
+def read_reviews():
+    """What a person decided in the LiveCams review window (data/review/decisions.csv).
+
+    Returns ({animal: [times confirmed, last date]}, number rejected) for "uncertain"
+    sightings, and {animal: [checked, wrong]} for "check" samples of names the tracker
+    logged. Publishes a copy of the decisions without local file names."""
+    confirmed, rejected, checks, rows = defaultdict(lambda: [0, ""]), 0, defaultdict(lambda: [0, 0]), []
     if DECISIONS_CSV.exists():
         with DECISIONS_CSV.open(encoding="utf-8") as f:
             for r in csv.DictReader(f):
-                rows.append([r["taken_at"], r["decision"], r["common_name"], r["best_guess"], r["best_guess_prob"]])
-                if r["decision"] == "approved":
+                kind, logged = r.get("kind") or "uncertain", r.get("logged_as") or ""
+                rows.append([r["taken_at"], kind, logged, r["decision"], r["common_name"],
+                             r["best_guess"], r["best_guess_prob"]])
+                if kind == "check":
+                    tally = checks[logged]
+                    tally[0] += 1
+                    tally[1] += not (r["decision"] == "approved" and r["common_name"] == logged)
+                elif r["decision"] == "approved":
                     c = confirmed[r["common_name"]]
                     c[0] += 1
                     c[1] = max(c[1], r["taken_at"][:10])
@@ -111,9 +132,10 @@ def update_confirmed():
     RESULTS.mkdir(exist_ok=True)
     with CONFIRMED_CSV.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["taken_at", "decision", "common_name", "tracker_best_guess", "tracker_best_guess_prob"])
+        w.writerow(["taken_at", "kind", "tracker_logged_as", "decision", "person_says", "tracker_best_guess",
+                    "tracker_best_guess_prob"])
         w.writerows(sorted(rows))
-    return confirmed, rejected
+    return confirmed, rejected, checks
 
 
 def build(effort, species):
@@ -145,14 +167,55 @@ def write_daily(days):
 def render_validation(validation):
     lines = ["", "### Validation (hand-checked samples)", ""]
     if not validation:
-        return lines + ["_No sample crops have been hand-checked yet, so treat the names above as unverified._"]
+        return lines + ["_No names have been checked by a person yet, so treat the names above as unverified "
+                        "model guesses._"]
     reviewed = sum(r for r, _ in validation.values())
     wrong = sum(w for _, w in validation.values())
-    lines += [f"{reviewed:,} sample crops checked by a person so far; "
+    lines += [f"{reviewed:,} of the tracker's names checked by a person so far; "
               f"{100 * (reviewed - wrong) / reviewed:.0f}% were named correctly.",
               "", "| Animal | Checked | Correct | Precision |", "|---|---:|---:|---:|"]
     for name, (r, w) in sorted(validation.items(), key=lambda kv: -kv[1][0]):
         lines.append(f"| {name} | {r} | {r - w} | {100 * (r - w) / r:.0f}% |")
+    return lines
+
+
+def load_environment():
+    if not ENV_CSV.exists():
+        return {}
+    with ENV_CSV.open(encoding="utf-8") as f:
+        return {(r["date"], int(r["hour"])): r for r in csv.DictReader(f)}
+
+
+def render_conditions(days, env):
+    """Daily conditions at the pier next to the day's sightings, last 7 tracked days."""
+    recent = sorted(days)[-7:]
+    if not env or not recent:
+        return []
+
+    def daily(d, column, how, hours=range(24)):
+        vals = [float(env[(d, h)][column]) for h in hours if env.get((d, h), {}).get(column) not in (None, "")]
+        return how(vals) if vals else None
+
+    def fmt(v, digits=1):
+        return "" if v is None else f"{v:.{digits}f}"
+
+    lines = ["", "### Conditions at the pier", "",
+             "From sensors on the pier: water temperature, turbidity and chlorophyll from the SCCOOS shore station "
+             "(~5 m deep, next to the camera; only readings that passed quality control), and the tide from NOAA's "
+             "La Jolla gauge. Hourly values for every day are in "
+             "[`results/environment_hourly.csv`](results/environment_hourly.csv), next to the hourly sightings in "
+             "[`results/hourly_summary.csv`](results/hourly_summary.csv).", "",
+             "| Date | Water temp (°C) | Turbidity, daytime (NTU) | Chlorophyll (µg/L) | Tide range (m) | Animal snapshots |",
+             "|---|---:|---:|---:|---:|---:|"]
+    daytime = range(7, 19)
+    for d in recent:
+        lo = daily(d, "tide_predicted_m", min)
+        hi = daily(d, "tide_predicted_m", max)
+        sightings = sum(s for s, _ in days[d]["species"].values())
+        lines.append(f"| {d} | {fmt(daily(d, 'pier_water_temp_c', statistics.mean))} | "
+                     f"{fmt(daily(d, 'turbidity_ntu', statistics.median, daytime), 2)} | "
+                     f"{fmt(daily(d, 'chlorophyll_ug_l', statistics.mean), 2)} | "
+                     f"{fmt(hi - lo if lo is not None and hi is not None else None, 2)} | {sightings:,} |")
     return lines
 
 
@@ -169,7 +232,7 @@ def render_confirmed(confirmed, rejected):
     return lines
 
 
-def render(days, by_hour_of_day, validation, confirmed, rejected):
+def render(days, by_hour_of_day, validation, confirmed, rejected, env):
     if not days:
         return "_No results yet. The tracker publishes here once a day after it starts running._"
     cats = categories()
@@ -201,14 +264,22 @@ def render(days, by_hour_of_day, validation, confirmed, rejected):
         "",
         "\"Snapshots\" counts snapshots the animal was in, not individual animals: a fish that hangs around",
         "for a minute shows up in about six snapshots. \"Most at once\" is the biggest count in one snapshot.",
+        "Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish",
+        "(too small to name) the count is a rough estimate from the moving specks, rounded.",
         "",
-        "| Animal | Type | Snapshots | % of daylight snapshots | Most at once | Days seen | First seen | Last seen |",
-        "|---|---|---:|---:|---:|---:|---|---|",
+        "Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many",
+        "of its names a person has looked at so far, and how many were right.",
+        "",
+        "| Animal | Type | Snapshots | % of daylight snapshots | Most at once | Days seen | First seen | Last seen | Checked |",
+        "|---|---|---:|---:|---:|---:|---|---|---|",
     ]
     for name, t in sorted(totals.items(), key=lambda kv: -kv[1]["seen"]):
         pct = 100 * t["seen"] / daylight if daylight else 0
-        lines.append(f"| {name} | {cats.get(name, '')} | {t['seen']:,} | {pct:.2f}% | {t['max']} | "
-                     f"{t['days']} | {t['first']} | {t['last']} |")
+        base = base_name(name)
+        r, w = validation.get(base, (0, 0))
+        checked = "—" if base in ("fish (unidentified)", "small fish") else f"{r - w} of {r} right" if r else "not yet"
+        lines.append(f"| {name} | {cats.get(base, '')} | {t['seen']:,} | {pct:.2f}% | {t['max']} | "
+                     f"{t['days']} | {t['first']} | {t['last']} | {checked} |")
 
     recent = [(date.fromisoformat(last) - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
     recent = [d for d in recent if d >= first]  # nothing to chart before tracking began
@@ -235,7 +306,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected):
         "",
         "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv).",
     ]
-    return "\n".join(lines + render_confirmed(confirmed, rejected) + render_validation(validation))
+    return "\n".join(lines + render_conditions(days, env) + render_confirmed(confirmed, rejected)
+                     + render_validation(validation))
 
 
 def update_readme(section):
@@ -248,13 +320,35 @@ def git(*args):
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, creationflags=NO_WINDOW)
 
 
+def publish_hourly(first_day):
+    """Copies the hourly sightings and hourly conditions (from the first tracked day) into results/."""
+    RESULTS.mkdir(exist_ok=True)
+    if HOURLY_CSV.exists():
+        shutil.copyfile(HOURLY_CSV, RESULTS / "hourly_summary.csv")
+    if ENV_CSV.exists() and first_day:
+        with ENV_CSV.open(encoding="utf-8") as src, (RESULTS / "environment_hourly.csv").open("w", newline="", encoding="utf-8") as dst:
+            reader = csv.DictReader(src)
+            writer = csv.DictWriter(dst, fieldnames=reader.fieldnames)
+            writer.writeheader()
+            writer.writerows(r for r in reader if r["date"] >= first_day)
+
+
 def main(push=True):
     effort, species = load_hourly()
     days, by_hour = build(effort, species)
+    first_day = min(days) if days else None
+    try:
+        environment.update(date.fromisoformat(first_day) if first_day else None)
+    except Exception as e:  # conditions are a bonus; never block the daily publish on them
+        print(f"could not update conditions: {e}")
+    publish_hourly(first_day)
     write_daily(days)
     validation = update_validation()
-    confirmed, rejected = update_confirmed()
-    update_readme(render(days, by_hour, validation, confirmed, rejected))
+    confirmed, rejected, checks = read_reviews()
+    for name, (checked, wrong) in checks.items():  # review-window checks count as validation too
+        validation[name][0] += checked
+        validation[name][1] += wrong
+    update_readme(render(days, by_hour, validation, confirmed, rejected, load_environment()))
     if not push:
         return
     git("add", "README.md", "results")
@@ -267,4 +361,5 @@ def main(push=True):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     main(push="--no-push" not in sys.argv)

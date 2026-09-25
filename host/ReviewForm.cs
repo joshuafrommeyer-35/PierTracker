@@ -4,9 +4,10 @@ using System.Text.Json;
 namespace LiveCams;
 
 /// <summary>
-/// Walks through the sightings the tracker wasn't sure about (data/review/pending):
-/// approve one of its guesses, pick the right animal, or mark it "not an animal".
-/// Decisions go to data/review/decisions.csv and feed the public results.
+/// Walks through data/review/pending: sightings the tracker wasn't sure about ("uncertain"),
+/// and a sample of names it did log ("check"). Approve a guess, pick the right animal, or
+/// mark it "not an animal". Decisions go to data/review/decisions.csv; answers to checks
+/// become the published accuracy, approved uncertain ones the "Confirmed by hand" list.
 /// Keys: 1-3 pick a guess, N = not an animal, S or Right = skip.
 /// </summary>
 internal sealed class ReviewForm : Form
@@ -17,11 +18,12 @@ internal sealed class ReviewForm : Form
     private readonly string pendingDir, approvedDir, rejectedDir, decisionsCsv;
     private readonly List<Species> species;
     private readonly PictureBox picture = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(24, 28, 34) };
-    private readonly Label info = new() { Dock = DockStyle.Top, Height = 28, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
+    private readonly Label info = new() { Dock = DockStyle.Top, Height = 32, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
     private readonly FlowLayoutPanel guessRow = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(4) };
     private readonly ComboBox other = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
     private List<string> items = new();
     private List<Guess> guesses = new();
+    private string kind = "uncertain", loggedAs = "";
     private int index;
 
     public ReviewForm(string configDir)
@@ -104,12 +106,17 @@ internal sealed class ReviewForm : Form
                 g.GetProperty("category").GetString()!, g.GetProperty("prob").GetDouble()))
             .ToList();
         string takenAt = doc.RootElement.GetProperty("taken_at").GetString()!;
+        kind = doc.RootElement.TryGetProperty("kind", out var k) ? k.GetString()! : "uncertain";
+        loggedAs = doc.RootElement.TryGetProperty("logged_as", out var l) ? l.GetString()! : "";
 
         string jpg = Path.ChangeExtension(json, ".jpg");
         if (File.Exists(jpg))
             picture.Image = Image.FromStream(new MemoryStream(File.ReadAllBytes(jpg))); // don't lock the file
 
-        info.Text = $"{index + 1} of {items.Count}   |   {takenAt.Replace('T', ' ')}   |   Is it one of these?";
+        string question = kind == "check"
+            ? $"The tracker logged this as a {loggedAs}. Is that right?"
+            : "The tracker wasn't sure. Is it one of these?";
+        info.Text = $"{index + 1} of {items.Count}   |   {takenAt.Replace('T', ' ')}   |   {question}";
         for (int g = 0; g < guesses.Count; g++)
         {
             var guess = guesses[g];
@@ -138,11 +145,12 @@ internal sealed class ReviewForm : Form
             bool newFile = !File.Exists(decisionsCsv);
             var row = new[]
             {
-                DateTime.Now.ToString("s"), takenAt, Path.GetFileName(jpg), decision, common, scientific, category,
-                best?.Common ?? "", best?.Prob.ToString("0.000") ?? "",
+                DateTime.Now.ToString("s"), takenAt, Path.GetFileName(jpg), kind, loggedAs, decision, common, scientific,
+                category, best?.Common ?? "", best?.Prob.ToString("0.000") ?? "",
             };
             var sb = new StringBuilder();
-            if (newFile) sb.AppendLine("reviewed_at,taken_at,image,decision,common_name,scientific_name,category,best_guess,best_guess_prob");
+            if (newFile)
+                sb.AppendLine("reviewed_at,taken_at,image,kind,logged_as,decision,common_name,scientific_name,category,best_guess,best_guess_prob");
             sb.AppendLine(string.Join(",", row.Select(v => $"\"{v.Replace("\"", "\"\"")}\"")));
             File.AppendAllText(decisionsCsv, sb.ToString());
         }

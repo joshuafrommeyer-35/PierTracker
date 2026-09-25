@@ -6,8 +6,10 @@ wallpaper, plus an animal tracker that watches the underwater cam and logs what 
 - **One monitor:** the [Scripps Pier cam](https://scripps.ucsd.edu/piercam) looking over La Jolla Shores.
 - **The other:** the [Under Scripps Pier cam](https://coollab.ucsd.edu/pierviz/), about 4 m down on a pier piling.
 - **Tracker:** every 10 seconds it takes a frame from the underwater cam, finds fish, octopus, crabs,
-  rays, sea lions and more, names them, and appends the results to a CSV. Sightings it isn't sure about
-  are saved as pictures for a person to approve. Once a day the summary below updates itself.
+  rays, sea lions and more, names them, and appends the results to a CSV. Schools are logged as schools,
+  not as hundreds of fish. Sightings it isn't sure about are saved as pictures for a person to approve.
+  Hourly conditions at the pier (water temperature, turbidity, chlorophyll, tide...) are recorded alongside.
+  Once a day the summary below updates itself.
 
 It is built to stay out of the way. It runs in Windows Efficiency mode, the tracker's models run on the
 otherwise idle Intel integrated GPU, and everything unloads while a game or other full-screen app runs.
@@ -48,51 +50,64 @@ rebroadcast.
 flowchart LR
     A["Underwater player<br/>(on the wallpaper)"] -->|"video frame<br/>every 10 s"| B{"Too dark?"}
     B -->|yes| N["Counted as a night snapshot.<br/>No model runs."]
-    B -->|no| C["Whole frame + 6 tiles<br/>to BioCLIP 2: octopus, crab,<br/>jelly, sea lion, diver...?"]
-    B -->|no| D["Fish detector<br/>(RF-DETR Nano)"]
-    D --> E["Crop each fish"] --> F["BioCLIP 2 names it<br/>from the species list"]
+    B -->|no| M["What moved?<br/>(vs. a learned background)"]
+    M --> D["Fish detector<br/>(RF-DETR Nano):<br/>moving boxes only"]
+    M --> C["Moving areas + whole frame<br/>to BioCLIP 2: octopus, crab,<br/>jelly, sea lion, diver...?"]
+    D -->|"under 80 px"| U["small fish, or one<br/>'small fish (school)'<br/>with a rough size"]
+    D -->|"80 px or more"| F["BioCLIP 2 names it<br/>(fish names only)"]
     C -->|sure| G[("data/sightings.csv")]
     F -->|sure| G
-    C -->|not sure| R["Review queue:<br/>picture + top 3 guesses"]
-    F -->|not sure| R
-    R -->|"approved by a person"| I
+    U --> G
+    C -->|not sure| R["Review window:<br/>picture + top 3 guesses"]
+    F -->|"not sure, or a<br/>sample to check"| R
+    R -->|"a person decides"| I
     G --> H[("hourly summary")] --> I["This README<br/>(daily)"]
 ```
 
 1. **Frame capture.** The wallpaper copies the current video frame straight from the player (1920×1080,
    without logos or overlays) to `frames/underwater/latest.jpg` every 10 s. No second stream is opened.
-2. **Night skip.** The tracker shrinks the frame to 64×36 and checks its brightness and detail. At night
-   the camera shows only noise, and those frames are counted but never reach a model.
-3. **Detection.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
-   (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) draws a box around
-   every fish above 0.35 confidence. Overlapping boxes are merged.
-4. **Species ID.** Each box is padded, cropped square and embedded by
-   [BioCLIP 2](https://huggingface.co/imageomics/bioclip-2), a vision model trained on the Tree of Life
-   that can match an image against species names it has never been fine-tuned on (zero-shot). The crop
-   is compared with 44 local animals from [`tracker/species.json`](tracker/species.json), described by
-   scientific and common names, plus 9 "not an animal" labels (murky water, kelp, pier piling, bubbles,
-   a smudge on the lens...).
-   - A crop that's clearly one of the "not an animal" labels is dropped.
-   - A fish whose best name scores below 0.60 is logged as **fish (unidentified)**. The tracker would
-     rather say "a fish" than guess wrong.
-5. **Not-fish (and big) animals.** The fish detector doesn't box an octopus, crab, lobster, jellyfish,
-   sea hare, sea lion or diver, and big rays or sharks can fill the whole frame. So these "scene" animals
-   (marked in `species.json`) are also looked for by comparing the whole frame, and every 30 s six
-   overlapping tiles of it, against every label. A small octopus that gets lost in the whole frame fills a
-   good part of one tile. An animal only counts when it wins with at least 0.70 probability against every
-   label, including all the fish and all the "not an animal" labels.
-6. **Uncertain sightings go to a person.** Two cases get saved to `data/review/pending` instead of being
-   logged under a guessed name:
-   - a fish whose best name scored between 0.25 and 0.60;
-   - a "scene" animal between 0.40 and 0.70.
+2. **Night skip.** The tracker shrinks the frame to 64×36 and checks brightness, detail and color. At
+   night the camera shows only purple-grey noise, and in daylight the water here is green. Night frames are
+   counted but never reach a model.
+3. **Motion.** The camera never moves, so the tracker keeps a slowly updated background of the scene,
+   covering roughly the last 100 seconds, and marks what changed. Pilings, the rope hanging from the pier
+   and the growth on them never move. The live test showed they are the main source of false sightings,
+   so anything that didn't move is ignored.
+4. **Fish.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
+   (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) boxes fish above 0.35 confidence, and
+   only boxes where something moved are kept.
+   - **Under 80 px** (most of the school, silhouetted against the surface) isn't named. Nobody can tell a
+     topsmelt from a sardine at that size. When there are five or more, the whole school is logged once
+     per snapshot as **small fish (school)**. Its size is estimated by counting the small moving specks,
+     because the detector only boxes a few of them. The estimate is rounded (~150, ~400) to avoid false
+     precision. Fewer than five are logged as **small fish**.
+   - **80 px and up** is cropped and embedded by [BioCLIP 2](https://huggingface.co/imageomics/bioclip-2),
+     a vision model trained on the Tree of Life that can match an image against species names it has never
+     been fine-tuned on (zero-shot). The crop is compared only with the **fish** in
+     [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
+     piling...). So a blurry fish can't come out as an octopus. Below 0.60 it's logged as
+     **fish (unidentified)**.
+5. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
+   sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
+   lot of it moved, are compared against every label (44 animals + 9 "not an animal"). A "scene" animal
+   (marked in `species.json`) counts when it wins with at least 0.70 probability. In a small moving area
+   it needs 0.90, or it has to show up again within 30 s: a real lobster stays put, but a flicker of fish
+   at a piling edge doesn't.
+6. **A person has the last word.** Two kinds of pictures go to the review window (`data/review/pending`):
+   - **"Not sure"**: a fish whose best name scored 0.25–0.60, or a non-fish between 0.40 and the bar
+     above. It is logged as unidentified, or not at all, until someone looks.
+   - **"Is this right?"**: a sample of the names the tracker *did* log. At most one per animal per hour,
+     plus every rare non-fish sighting. The answers are the published accuracy.
 
-   Each one is saved as a picture: the close-up, where it was in the frame, and the top 3 guesses. At most
-   one is saved per guess per 10 minutes. See [Reviewing uncertain sightings](#reviewing-uncertain-sightings).
+   Each picture shows the close-up, where it was in the frame, and the top 3 guesses. There are at most
+   ~10 an hour. See [Reviewing uncertain sightings](#reviewing-uncertain-sightings).
 7. **Logging.**
    - `data/sightings.csv` gets one row per animal type per snapshot:
      `timestamp, date, time, common_name, scientific_name, category, count, confidence`.
    - `data/hourly_summary.csv` rolls these up per hour, with how many snapshots were analyzed and how
      many were dark.
+   - Five or more of one named kind in a snapshot is logged once as **"<kind> (school)"**, for example
+     "blacksmith (school)", with the count.
    - Once a day, `tracker/publish_results.py` turns that into the results section above and pushes it.
 
 Both models are converted once to [OpenVINO](https://github.com/openvinotoolkit/openvino) (half
@@ -100,13 +115,33 @@ precision). The running tracker needs only OpenVINO, NumPy and Pillow, not PyTor
 the Intel integrated GPU when there is one, and never on a discrete card. Without one, it uses two CPU
 efficiency cores.
 
+### Conditions at the pier (`tracker/environment.py`)
+
+Once a day the tracker fetches hourly conditions from two public, quality-controlled sources on the pier
+itself, and saves them next to the sightings (`data/environment_hourly.csv`, published as
+[`results/environment_hourly.csv`](results/environment_hourly.csv)):
+
+| Source | Measures | Notes |
+|---|---|---|
+| [NOAA tide gauge 9410230 "La Jolla"](https://tidesandcurrents.noaa.gov/stationhome.html?id=9410230) | Predicted tide and observed water level (m above MLLW), rising/falling, water and air temperature, wind, air pressure | Official NOAA data |
+| [SCCOOS Automated Shore Station, Scripps Pier](https://sccoos.org/autoss/) | Water temperature, salinity, dissolved oxygen, pH, turbidity, chlorophyll | Sensors ~5 m deep, next to the camera's ~4 m. Only readings that passed the station's [QARTOD](https://ioos.noaa.gov/project/qartod/) quality tests are kept |
+
+The sources were checked before use:
+- On the first day, NOAA's water temperature (22.5 °C) and the shore station's (22.46 °C) agreed.
+- One of the station's two chlorophyll sensors wasn't reporting, so the working one is used.
+- About 12% of turbidity readings fail quality control, and those are dropped.
+
+Each value is the median of that hour's readings. The hourly sightings (`results/hourly_summary.csv`) and
+hourly conditions join on `date` + `hour`.
+
 ### What the numbers mean
 
 - A **snapshot** is one analyzed frame (every 10 s). The tracker doesn't follow individual animals between
   frames, so a garibaldi that hangs around for a minute appears in about 6 snapshots. "Snapshots seen" is
   a measure of **presence over time**, not a head count.
-- **Count** is how many of that animal were in a single snapshot. Schools of topsmelt overlap, so large
-  schools are undercounted.
+- **Count** is how many of that animal were in a single snapshot. For a school of small fish it's a
+  rounded estimate from the moving specks. It gets the order of magnitude right (a hundred vs. a few
+  hundred), not the exact number.
 - Animals that never move (anemones, mussels on the piling) aren't in the species list on purpose.
 
 ## Validation
@@ -148,7 +183,38 @@ One honest correction from testing: that shark photo was first described here as
 and "blacksmith" was counted as a wrong name. The review picture showed two dark fish next to one shark.
 Reviewing the tracker's pictures catches mistakes in both directions.
 
-### 2. Ongoing hand-checks on live footage
+### 2. First live morning (2026-09-25)
+
+The first version ran on the live cam from sunrise to 08:40 and got a lot wrong. Here's what a look through
+its 84 sample crops and 208 review pictures showed:
+
+| Problem | Example | Fix |
+|---|---|---|
+| Pilings and the hanging rope boxed as fish and given fish names | the rope logged as "sargo" (0.79), a piling as "salema" | Motion filter: things that don't move are ignored |
+| Tiles of the piling named as crabs | "sheep crab" at up to 0.89 on bare piling | Tile scan replaced by moving areas only |
+| Small fish given non-fish names | 40–60 px fish logged as "octopus", "jellyfish", "bat ray" | Fish-detector boxes get fish names only |
+| Tiny backlit fish given confident species names | 50 px silhouettes as "blacksmith" (0.9+) | Under 80 px: "fish (unidentified)" |
+| A night frame got through | noise with a bright blob at 04:40 | Night check also looks at color |
+| Review queue flooded | 208 pictures in ~2 hours | At most ~10 an hour, only things a person can judge |
+| A school of hundreds logged as individual fish | "11 fish (unidentified)" every 10 s | One "small fish (school)" sighting per snapshot, with a rough size |
+
+The fixed version was replayed on 29 consecutive live frames (5 minutes) and then deployed. The data
+logged before the fix was set aside and isn't in the results.
+
+On those 5 minutes the fixed version logged:
+
+| Result | Verdict |
+|---|---|
+| 136 fish (unidentified) | ✅ the school, honestly unnamed |
+| 1 **kelp bass** (0.99): a big blotchy bass cruising past a piling | ✅ looks right |
+| 2 Pacific sardine | ✅ plausible: slender, silvery |
+| A "spiny lobster" at a piling edge (0.72) | ✅ correctly held back: sent to review instead of logged. It was fish passing a cable. |
+| 23 **blacksmith** (0.94–0.99) | ❓ doubtful. Several crops look like yellow **señoritas** or olive fish, not dark blacksmith. BioCLIP is overconfident on green, blurry footage. |
+
+That last row is why every name in the results carries a **Checked** column, and why the review window
+samples confident names too. Until people check them, the names are the model's guesses.
+
+### 3. Ongoing hand-checks on live footage
 
 Clear reference photos flatter any model. The real test is the live cam, which is often green and murky.
 So the tracker keeps **one sample crop per animal type every 10 minutes** in `data/crops/<date>/`, named
@@ -163,14 +229,36 @@ in the results above. Precision is the share of names that were right. The talli
 [`results/validation.csv`](results/validation.csv) even after old crops are deleted (after 14 days).
 Until some days are checked, the results section says the names are unverified.
 
-### 3. Uncertain sightings, checked by a person
+### 4. Uncertain sightings, checked by a person
 
-The review queue (above) is the third check, and the one that catches rarer animals. Approved sightings
-are listed in **Confirmed by hand** in the results, separately from the automatic counts.
+The review window is the main check. Answers to **"Is this right?"** pictures become the **Checked**
+column and the **Validation** table. **"Not sure"** pictures that a person approves are listed in
+**Confirmed by hand**, separately from the automatic counts. That's also how rarer animals get recorded
+when the model hesitates.
 
 **Improving it:** checked crops and approved review pictures are exactly the training data needed to go
 past zero-shot. About 50 per species are enough to train a small classifier on BioCLIP's image embeddings,
 which usually beats zero-shot by a wide margin on a specific camera.
+
+## Where this could go (modeling)
+
+The tracker already runs on two machine-learning models (a detector and BioCLIP 2). Once a few weeks of
+data exist, there's room for more:
+
+1. **A classifier fitted to this camera.** Every review picture saves BioCLIP's image embedding next to
+   the person's answer. About 30–50 answers per species are enough to train a small classifier (logistic
+   regression on the embeddings, seconds on a CPU). That usually beats zero-shot naming by a wide margin on
+   a single camera. The review queue already picks the pictures the model is least sure about, which is a
+   simple form of active learning.
+2. **What drives what shows up.** Model sightings per hour against the pier's conditions: water
+   temperature, turbidity, chlorophyll, tide height and direction, time of day, season.
+   - Count models (Poisson or negative binomial GLMs/GAMs) or gradient-boosted trees would show things like
+     "leopard sharks show up on rising tides in warm water".
+   - An occupancy model can separate "not there" from "there but the water was too murky to see".
+3. **Forecasts.** With enough history: what are the odds of seeing a sea lion or a ray in the next hour,
+   given the tide and conditions now?
+4. **Better counts.** A detector fine-tuned on this camera's small fish (from a few hundred boxed frames)
+   would count schools far better than the current motion-speck estimate.
 
 ## Performance
 
@@ -179,7 +267,7 @@ Measured on the machine this runs on: i7-13700K, Radeon RX 7800 XT, Intel UHD 77
 | State | CPU | GPU | RAM |
 |---|---|---|---|
 | Both cams live + tracker (between frames) | ~0.8% of total CPU | Radeon: 0.25% 3D; video decode on its separate decode engine | ~2.5 GB |
-| Tracker, per daytime frame | ~0.03–0.1 s of CPU time | ~0.4–0.9 s on the Intel iGPU (~1.7–2.2 s on every 3rd frame, the tile scan) | (included above) |
+| Tracker, per daytime frame | ~0.03–0.1 s of CPU time | ~0.5–2.5 s on the Intel iGPU (more when many fish are close) | (included above) |
 | Tracker, per night frame | ~0 (no model runs) | none | models unloaded after 10 min dark: ~1.1 GB freed |
 | Full-screen game or app running | 0.0% | none | ~0.7 GB, idle (tracker models unloaded after 10 min) |
 | Turned off (`--off`) | nothing running | none | 0 |
@@ -238,7 +326,10 @@ Re-run `setup_models.py` after editing `tracker/species.json`. To publish result
 ### Reviewing uncertain sightings
 
 Tray icon → **Review uncertain sightings (N)...** shows each saved picture: the close-up on the left, and
-where it was in the frame on the right.
+where it was in the frame on the right. The top line says which kind it is:
+- **"The tracker wasn't sure. Is it one of these?"**
+- **"The tracker logged this as a ___. Is that right?"** Press `1` if it's right. Otherwise pick the
+  right animal, or press `N`.
 
 | Key | Action |
 |---|---|
@@ -272,7 +363,8 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/sightings.csv` | Every sighting: one row per animal type per snapshot |
 | `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
-| `data/review/` | Uncertain sightings: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
+| `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
+| `data/environment_hourly.csv` | Hourly conditions at the pier (NOAA + SCCOOS) |
 | `frames/` | The latest tracker frame, and the stills used by `--off` |
 | `logs/host.log`, `logs/tracker.log` | What the app and tracker did |
 
@@ -283,9 +375,11 @@ host/                 LiveCams wallpaper app (C#, .NET 8, WebView2)
 tracker/
   tracker.py          the background tracker
   setup_models.py     one-time model download + OpenVINO conversion
+  environment.py      hourly conditions at the pier (NOAA tide gauge + SCCOOS shore station)
   publish_results.py  daily README/results update
   species.json        the animals it can name (edit to taste)
-results/              published summaries (daily, validation, confirmed by hand)
+results/              published summaries: daily, hourly sightings, hourly conditions,
+                      validation, confirmed by hand
 livecams.json         configuration
 ```
 
@@ -301,6 +395,10 @@ livecams.json         configuration
     on [RF-DETR](https://github.com/roboflow/rf-detr) (Apache-2.0)
   - [BioCLIP 2](https://huggingface.co/imageomics/bioclip-2) by Imageomics (MIT), loaded with
     [OpenCLIP](https://github.com/mlfoundations/open_clip)
+- **Conditions data:**
+  - NOAA CO-OPS, tide station 9410230 La Jolla (public domain).
+  - SCCOOS Automated Shore Station, Scripps Pier, served by CeNCOOS. Free to use and redistribute; please
+    credit CeNCOOS and NOAA. Not for legal use; the providers give no warranty.
 - **Runtime:** [OpenVINO](https://github.com/openvinotoolkit/openvino) (Apache-2.0),
   [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/).
 
