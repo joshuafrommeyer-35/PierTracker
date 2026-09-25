@@ -6,10 +6,12 @@ wallpaper, plus an animal tracker that watches the underwater cam and logs what 
 - **One monitor:** the [Scripps Pier cam](https://scripps.ucsd.edu/piercam) looking over La Jolla Shores.
 - **The other:** the [Under Scripps Pier cam](https://coollab.ucsd.edu/pierviz/), about 4 m down on a pier piling.
 - **Tracker:** every 10 seconds it takes a frame from the underwater cam, finds fish, octopus, crabs,
-  rays, sea lions and more, names them, and appends the results to a CSV. Schools are logged as schools,
+  rays, sea lions and more, names them, and records the results in a database. Schools are logged as schools,
   not as hundreds of fish. Sightings it isn't sure about are saved as pictures for a person to approve.
   Hourly conditions at the pier (water temperature, turbidity, chlorophyll, tide...) are recorded alongside.
   Once a day the summary below updates itself.
+
+A project by Joshua Frommeyer, built with Claude. See [How this was built](#how-this-was-built).
 
 It is built to stay out of the way. It runs in Windows Efficiency mode, the tracker's models run on the
 otherwise idle Intel integrated GPU, and everything unloads while a game or other full-screen app runs.
@@ -817,6 +819,14 @@ tests/                automated tests (python -m pytest tests); run on GitHub fo
 community/            community IDs: viewers click a box and say what it is (built, not public yet:
                       docs/COMMUNITY.md)
 ```
+
+## How this was built
+
+PierTracker is Joshua Frommeyer's project. The idea, the questions it asks (what lives under the pier, and
+how that changes with water temperature, turbidity, tides and this year's El Niño), and the decisions
+about what counts, how it's checked and what gets published come from Joshua. The code was written with
+Claude, which is why the commits list Claude as a co-author. Uncertain identifications go to a person,
+and the validation and caveats in this README are there because a model's guesses aren't taken on trust.
 
 ## Credits
 
