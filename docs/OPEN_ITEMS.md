@@ -14,9 +14,13 @@ These are built and switch themselves on; they only need time or answers.
 
 ## In progress
 
-- **Reference photos** (started 2026-09-25): does showing the model iNaturalist photos degraded to camera
-  conditions beat matching species names alone? Needs no camera data. Result decides whether it's
-  switched on.
+- **Reference photos** (tested 2026-09-25): a small classifier trained on ~500 underwater iNaturalist
+  photos (degraded to camera conditions) beat matching species names alone on held-out photos: 92.5% vs
+  87.1% of names right, 58.5% vs 54.0% of fish named right, no confident mistakes on young blacksmith
+  (vs 3). Adding this camera's own background as "not an animal" cut false alarms from ~18% to 0-3%.
+  Caveats: simulated camera conditions, and only 20% of the photos were underwater (some species have
+  none). **Next:** run it in shadow mode (logged next to the live names, not used) and switch it on
+  only if it beats the current names on the review answers.
 
 ## Built, not live
 
