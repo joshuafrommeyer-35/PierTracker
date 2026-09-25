@@ -1,0 +1,4 @@
+# What tracker.py needs at runtime (no PyTorch: the models run through OpenVINO).
+openvino==2026.4.0
+numpy==2.5.2
+pillow==12.3.0

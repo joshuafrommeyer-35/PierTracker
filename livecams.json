@@ -1,0 +1,41 @@
+{
+  // Monitors are numbered left to right: 1 = 2560x1440 (primary), 2 = 1920x1080.
+  "cams": [
+    {
+      "name": "Scripps Pier",
+      "monitor": 1,
+      "page": "https://scripps.ucsd.edu/piercam",
+      "iframe": "iframe[src*='5834a0733421b20545c4b584']",
+      "extraBottomPx": 40,            // Surfline's toolbar under the video, pushed off-screen
+      "mode": "resumeWhenWatched"     // honor the player's 5-minute pause; resume only while you're looking
+    },
+    {
+      "name": "Under Scripps Pier",
+      "monitor": 2,
+      "page": "https://coollab.ucsd.edu/pierviz/",
+      "iframe": "iframe[src*='hdontap.com']",
+      "extraBottomPx": 0,
+      "mode": "alwaysOn",                // the stream never stops, so the animal logger always has frames
+      "freezeDisplayAfterSeconds": 300,  // your screen freezes after 5 min; click the desktop there to go live again
+      "captureEverySeconds": 10,      // frames for the animal logger
+      "captureDir": "frames/underwater"
+    }
+  ],
+  // "Looking" = the monitor isn't mostly covered by a window AND there was input in the last N seconds.
+  "watchedIdleSeconds": 120,
+  "coverThreshold": 0.5,
+
+  // While a game (or anything) runs full-screen, the cams unload and leave a still: zero cost.
+  "pauseDuringFullscreenApps": true,
+
+  // The animal tracker (Python). It reads frames saved by the underwater cam above.
+  "tracker": {
+    "enabled": true,
+    "python": "tracker/.venv/Scripts/pythonw.exe",
+    "script": "tracker/tracker.py",
+    "publishResults": true            // once a day, push summary stats to the GitHub README
+  },
+
+  // Troubleshooting only: opens Chrome DevTools for the cam pages on this localhost port.
+  "debugPort": 0
+}

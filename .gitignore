@@ -1,0 +1,15 @@
+# Build output
+app/
+host/bin/
+host/obj/
+host/webview-data/
+
+# Runtime files (frames, logs, raw per-snapshot data and crops stay local)
+frames/
+logs/
+data/
+
+# Tracker environment and downloaded/converted models (recreate with setup_models.py)
+tracker/.venv/
+tracker/models/
+__pycache__/

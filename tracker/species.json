@@ -1,0 +1,62 @@
+{
+  "_comment": "Animals the tracker can name. Realistic for ~4 m under Scripps Pier (La Jolla). Add or remove entries, then re-run setup_models.py. 'negative' entries soak up false detections (murk, kelp, pilings) and are never logged. 'scene' entries are big animals checked against the whole frame, not just detected fish.",
+  "species": [
+    {"common": "garibaldi", "scientific": "Hypsypops rubicundus", "category": "fish"},
+    {"common": "California sheephead", "scientific": "Semicossyphus pulcher", "category": "fish"},
+    {"common": "opaleye", "scientific": "Girella nigricans", "category": "fish"},
+    {"common": "halfmoon", "scientific": "Medialuna californiensis", "category": "fish"},
+    {"common": "senorita", "scientific": "Oxyjulis californica", "category": "fish"},
+    {"common": "kelp bass", "scientific": "Paralabrax clathratus", "category": "fish"},
+    {"common": "barred sand bass", "scientific": "Paralabrax nebulifer", "category": "fish"},
+    {"common": "giant sea bass", "scientific": "Stereolepis gigas", "category": "fish"},
+    {"common": "California scorpionfish", "scientific": "Scorpaena guttata", "category": "fish"},
+    {"common": "black perch", "scientific": "Embiotoca jacksoni", "category": "fish"},
+    {"common": "pile perch", "scientific": "Rhacochilus vacca", "category": "fish"},
+    {"common": "rubberlip seaperch", "scientific": "Rhacochilus toxotes", "category": "fish"},
+    {"common": "walleye surfperch", "scientific": "Hyperprosopon argenteum", "category": "fish"},
+    {"common": "shiner perch", "scientific": "Cymatogaster aggregata", "category": "fish"},
+    {"common": "topsmelt", "scientific": "Atherinops affinis", "category": "fish"},
+    {"common": "jacksmelt", "scientific": "Atherinopsis californiensis", "category": "fish"},
+    {"common": "northern anchovy", "scientific": "Engraulis mordax", "category": "fish"},
+    {"common": "Pacific sardine", "scientific": "Sardinops sagax", "category": "fish"},
+    {"common": "salema", "scientific": "Haemulon californiensis", "category": "fish"},
+    {"common": "sargo", "scientific": "Anisotremus davidsonii", "category": "fish"},
+    {"common": "blacksmith", "scientific": "Chromis punctipinnis", "category": "fish"},
+    {"common": "California corbina", "scientific": "Menticirrhus undulatus", "category": "fish"},
+    {"common": "California halibut", "scientific": "Paralichthys californicus", "category": "fish"},
+
+    {"common": "leopard shark", "scientific": "Triakis semifasciata", "category": "shark/ray", "scene": true},
+    {"common": "horn shark", "scientific": "Heterodontus francisci", "category": "shark/ray"},
+    {"common": "shovelnose guitarfish", "scientific": "Pseudobatos productus", "category": "shark/ray", "scene": true},
+    {"common": "bat ray", "scientific": "Myliobatis californica", "category": "shark/ray", "scene": true},
+    {"common": "round stingray", "scientific": "Urobatis halleri", "category": "shark/ray"},
+
+    {"common": "California sea lion", "scientific": "Zalophus californianus", "category": "mammal", "scene": true},
+    {"common": "harbor seal", "scientific": "Phoca vitulina", "category": "mammal", "scene": true},
+    {"common": "diving cormorant", "scientific": "Phalacrocorax", "category": "bird", "scene": true},
+
+    {"common": "California spiny lobster", "scientific": "Panulirus interruptus", "category": "invertebrate", "scene": true},
+    {"common": "octopus", "scientific": "Octopus bimaculoides", "category": "invertebrate", "scene": true},
+    {"common": "sheep crab", "scientific": "Loxorhynchus grandis", "category": "invertebrate"},
+    {"common": "giant spined sea star", "scientific": "Pisaster giganteus", "category": "invertebrate"},
+    {"common": "bat star", "scientific": "Patiria miniata", "category": "invertebrate"},
+    {"common": "California sea hare", "scientific": "Aplysia californica", "category": "invertebrate"},
+    {"common": "black sea nettle jellyfish", "scientific": "Chrysaora achlyos", "category": "invertebrate", "scene": true},
+    {"common": "purple-striped jellyfish", "scientific": "Chrysaora colorata", "category": "invertebrate", "scene": true},
+    {"common": "Pacific sea nettle jellyfish", "scientific": "Chrysaora fuscescens", "category": "invertebrate", "scene": true},
+    {"common": "moon jellyfish", "scientific": "Aurelia aurita", "category": "invertebrate", "scene": true},
+
+    {"common": "scuba diver", "scientific": "", "category": "person", "scene": true}
+  ],
+  "negative": [
+    "murky green water",
+    "empty blue underwater scene",
+    "suspended particles floating in water",
+    "kelp and seaweed",
+    "pier piling covered in mussels and anemones",
+    "sandy sea floor",
+    "air bubbles",
+    "a blurry smudge on a camera lens",
+    "a dark night-time underwater camera image with sensor noise"
+  ]
+}
