@@ -17,6 +17,7 @@ internal static class Program
     {
         if (args.Contains("--off")) { RemoteControl.TurnOff(freeze: true); return; }
         if (args.Contains("--quit")) { RemoteControl.TurnOff(freeze: false); return; }
+        if (args.Contains("--relaunch")) { RemoteControl.Relaunch(); return; }
         if (args.Contains("--pause")) { RemoteControl.SetPaused(true); return; }
         if (args.Contains("--resume")) { RemoteControl.SetPaused(false); return; }
         if (args.Contains("--review"))
@@ -67,9 +68,21 @@ internal static class RemoteControl
             using (signal) signal.Set();
     }
 
-    public static void TurnOff(bool freeze)
+    /// <summary>--relaunch: restart the running instance (e.g. after an update) without touching the
+    /// start-at-login setting or a pause. Waits until the old one has fully exited.</summary>
+    public static void Relaunch()
     {
-        Autostart.Disable();
+        TurnOff(freeze: false, keepAutostart: true);
+        Process.Start(new ProcessStartInfo(Environment.ProcessPath!)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = Path.GetDirectoryName(Environment.ProcessPath!)!,
+        });
+    }
+
+    public static void TurnOff(bool freeze, bool keepAutostart = false)
+    {
+        if (!keepAutostart) Autostart.Disable();
         if (!EventWaitHandle.TryOpenExisting(freeze ? Program.OffEventName : Program.QuitEventName, out var signal))
             return; // not running
         using (signal) signal.Set();

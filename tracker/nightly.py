@@ -86,11 +86,12 @@ def main(publish: bool, backup_dir: str = None):
     step("conditions", environment.update)
 
     def sync_database():
-        with db.connect() as con:
+        with closing(db.connect()) as con:
             db.sync(con)
     step("database", sync_database)
-    from ml import conditions_model, train_classifier
+    from ml import conditions_model, reference_photos, train_classifier
     step("camera classifier", train_classifier.main)
+    step("reference photos (shadow check)", reference_photos.evaluate)
     step("conditions model", conditions_model.main)
     if publish:
         import publish_results

@@ -58,6 +58,8 @@ STOP_FILE = LIVECAMS / "tracker.stop"  # LiveCams creates this to ask the tracke
 CROPS = DATA / "crops"
 REVIEW = DATA / "review" / "pending"
 CAMERA_MODEL = MODELS / "camera_classifier.npz"
+REFERENCE_PROBE = MODELS / "reference_probe.npz"  # tracker/ml/reference_photos.py; shadow mode for now
+NOT_AN_ANIMAL = "not an animal"
 BANK = DATA / "frame_bank"
 BACKGROUND_IMAGE = DATA / "background.png"
 FIXTURE_GALLERY = DATA / "fixture_gallery.npz"
@@ -190,6 +192,7 @@ class Models:
         self.label_emb = np.load(MODELS / "label_embeddings.npy")
         self.embedding_model = meta.get("model", "hf-hub:imageomics/bioclip-2")
         self.camera, self.camera_mtime = None, None
+        self.reference, self.reference_mtime = None, None
         # The fish detector only finds fish, so its boxes are only ever given fish names (or a
         # "not an animal" label): a blurry fish can't come out as an octopus or a jellyfish.
         self.fish_idx = np.array([i for i, l in enumerate(self.labels)
@@ -273,12 +276,66 @@ class Models:
         label = self.groups.get(name) or next((l for l in self.labels if l["common"] == name), None)
         return (label, float(p[best])) if label else None
 
+    def reference_opinion(self, embedding: np.ndarray, subset=None):
+        """Shadow mode: what the classifier trained on reference photos would call this, as
+        {"name", "prob", "not_animal"}, or None when it isn't there. Not used for logging yet: stored
+        on review pictures and compared with people's answers (ml/reference_photos.py evaluate)."""
+        mtime = REFERENCE_PROBE.stat().st_mtime if REFERENCE_PROBE.exists() else None
+        if mtime != self.reference_mtime:  # (re)load after retraining
+            self.reference_mtime, self.reference = mtime, None
+            if mtime:
+                with np.load(REFERENCE_PROBE, allow_pickle=False) as d:
+                    if str(d["embedding_model"]) == self.embedding_model:
+                        self.reference = {k: d[k] for k in d.files}
+        if self.reference is None:
+            return None
+        r = self.reference
+        index = np.arange(len(self.labels)) if subset is None else np.asarray(subset)
+        names = [self.labels[i]["common"] for i in index]
+        negative = np.array([self.labels[i]["negative"] for i in index])
+        p = combine_reference(self.probabilities(embedding, subset), names, negative,
+                              reference_probs(r, embedding), [str(c) for c in r["classes"]], float(r["w"]))
+        animals = np.where(~negative)[0]
+        best = animals[int(p[animals].argmax())]
+        return {"name": names[best], "prob": round(float(p[best]), 3), "not_animal": round(float(p[negative].sum()), 3)}
+
     def probabilities(self, embedding: np.ndarray, subset=None) -> np.ndarray:
         """Softmax over all labels, or over labels[subset] (then index i means labels[subset[i]])."""
         emb = self.label_emb if subset is None else self.label_emb[subset]
         logits = self.logit_scale * emb @ embedding
         p = np.exp(logits - logits.max())
         return p / p.sum()
+
+
+def reference_probs(probe, embedding: np.ndarray) -> np.ndarray:
+    """The reference-photo classifier's probabilities over its own classes (species + not an animal)."""
+    e = np.asarray(embedding, np.float64)
+    z = probe["coef"] @ (e / np.linalg.norm(e)) + probe["intercept"]
+    p = np.exp(z - z.max())
+    return p / p.sum()
+
+
+def combine_reference(zero_shot, names, negative, probe_probs, probe_classes, w):
+    """Mixes the reference-photo classifier into zero-shot probabilities over the same labels. How likely
+    it's an animal at all comes from zero-shot, lowered by the classifier's own "not an animal" vote
+    (trained on this camera's background); which animal is zero-shot's share and the classifier's,
+    mixed as zero_shot^(1-w) * classifier^w for the species the classifier knows."""
+    zs = np.asarray(zero_shot, np.float64)
+    animal = ~np.asarray(negative)
+    zs_animal = float(zs[animal].sum())
+    cond = zs[animal] / max(zs_animal, 1e-12)
+    index = {c: i for i, c in enumerate(probe_classes)}
+    q = cond.copy()
+    for j, name in enumerate(n for n, a in zip(names, animal) if a):
+        if name in index:
+            q[j] = probe_probs[index[name]]
+    mix = np.exp((1 - w) * np.log(cond + 1e-12) + w * np.log(q + 1e-12))
+    mix /= mix.sum()
+    share = zs_animal * (1 - probe_probs[index[NOT_AN_ANIMAL]]) if NOT_AN_ANIMAL in index else zs_animal
+    out = zs.copy()
+    out[~animal] = zs[~animal] * (1 - share) / max(1 - zs_animal, 1e-12)
+    out[animal] = share * mix
+    return out
 
 
 def file_safe(name: str) -> str:
@@ -830,7 +887,7 @@ class Tracker:
             if verdict == "suspect":
                 guesses = top_guesses(m.labels, probs, m.fish_idx)
                 if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
-                    queue(crop, img, box[:4], guesses, when, embedding=emb)
+                    queue(crop, img, box[:4], guesses, when, embedding=emb, subset=m.fish_idx)
                     seen_here(box, guesses[0]["common"], guesses[0]["prob"], "unsure")
                 continue
             camera = m.camera_name(emb)
@@ -847,11 +904,11 @@ class Tracker:
             if label is None or label.get("group"):
                 # Not sure of the species: a person may be able to tell.
                 if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
-                    queue(crop, img, box[:4], guesses, when, embedding=emb)
+                    queue(crop, img, box[:4], guesses, when, embedding=emb, subset=m.fish_idx)
                 if label is None:
                     label, prob, method = UNIDENTIFIED, float(box[4]), "detector only"  # not even the group
             else:
-                queue(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb)
+                queue(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb, subset=m.fish_idx)
             add(label, prob, method=method)
             self._save_crop(crop, when, label["common"], prob)
             seen_here(box, label["common"], prob, "unsure" if label is UNIDENTIFIED else "logged")
@@ -935,7 +992,7 @@ class Tracker:
                             t.looks, label["common"] if label else UNIDENTIFIED["common"], prob)
 
     def _queue_review(self, view: Image.Image, frame: Image.Image, box, guesses, when: datetime, logged_as=None,
-                      embedding=None):
+                      embedding=None, subset=None):
         """Saves a sighting for a person to look at in the LiveCams review window: either one the
         tracker wasn't sure about ("uncertain"), or, with logged_as, a sample of a name it did
         log ("check"), so the published stats can say how often its names are right."""
@@ -966,6 +1023,9 @@ class Tracker:
             # example for a classifier fitted to this camera (see "Where this could go" in the README).
             "embedding": [] if embedding is None else [round(float(v), 4) for v in embedding],
             "embedding_model": self._models.embedding_model if self._models else "",
+            # shadow mode: the reference-photo classifier's call, compared later with the person's answer
+            "shadow": (self._models.reference_opinion(np.asarray(embedding), subset)
+                       if self._models is not None and embedding is not None else None),
         }), encoding="utf-8")
         log.info("queued for review (%s): %s (%.0f%%)", kind, name, 100 * guesses[0]["prob"])
 

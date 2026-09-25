@@ -442,7 +442,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "",
         "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: "
         "[what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the "
-        "[camera-trained classifier](results/camera_classifier.md) (trained from the review answers).",
+        "[camera-trained classifier](results/camera_classifier.md) (trained from the review answers) and the "
+        "[reference-photo classifier](results/reference_probe.md) (in shadow mode until it beats the names on review answers).",
     ]
     return "\n".join(lines + render_conditions(conditions) + render_confirmed(confirmed, rejected)
                      + render_validation(validation))

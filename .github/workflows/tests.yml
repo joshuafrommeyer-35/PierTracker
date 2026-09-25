@@ -1,0 +1,27 @@
+name: tests
+
+# Code changes only: the nightly results commits (README.md, results/) don't trigger it.
+on:
+  push:
+    paths: ["tracker/**", "host/**", "community/**", "tests/**", "setup.ps1", ".github/workflows/**"]
+  pull_request:
+
+jobs:
+  tracker:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tracker/requirements-dev.txt
+      - run: python -m pytest -q tests
+
+  app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet build host -c Release

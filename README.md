@@ -613,6 +613,17 @@ Results are odds ratios per typical (1 SD) change with 95% intervals, in
 - **Caveats:** it shows associations, not causes. Neighbouring hours aren't independent, so the intervals
   are optimistic.
 
+### Reference-photo classifier (`tracker/ml/reference_photos.py`, shadow mode)
+
+A small classifier trained on ~500 underwater iNaturalist photos of 48 of the species, degraded to look
+like this camera, plus crops of this camera's own background as "not an animal". On held-out photos it
+named 60.5% of the fish correctly against 49.0% for names alone, with no false alarms on this camera's
+background (against 17.8%). Those are simulated conditions, so it runs in **shadow mode**: every review
+picture carries its opinion next to the tracker's, and each night it's compared with people's answers
+([`results/reference_probe.md`](results/reference_probe.md)). It gets switched on only after beating the
+names by 5+ points on at least 30 answers. One weakness is already visible: an antenna poking out of the
+lobster's crevice looks like background to it.
+
 ### Next steps once there's a season of data
 
 - **Occupancy models** separate "not there" from "there but too murky to see", using turbidity and time
@@ -705,6 +716,7 @@ Re-run `setup_models.py` after editing `tracker/species.json`. To publish result
 | `app\LiveCams.exe --quit` | Shuts down without freezing; your normal wallpaper comes back |
 | Click the empty desktop on a cam's monitor | Resumes that cam, or reloads it if it's broken. On the underwater monitor: go live again |
 | Tray icon (wave) | Status on hover. Menu: review uncertain sightings, **pause cams + tracker** (for demanding games), resume a cam, reload, open the folder, turn off. Double-click resumes everything. An amber dot means sightings are waiting for review; grey means paused |
+| `app\LiveCams.exe --relaunch` | Restart it (e.g. after an update), keeping the start-at-login setting and any pause |
 | `app\LiveCams.exe --pause` / `--resume` | Pause: each monitor keeps a still, the cams unload and the tracker stops (its memory is freed). It stays paused, across restarts too, until resumed (or `--on`). Full-screen games already pause the cams automatically; this makes sure, e.g. for a game in a borderless window |
 | `app\LiveCams.exe --review` | The review window on its own, even while the cams are off |
 
@@ -800,6 +812,7 @@ results/              published summaries: daily, hourly sightings, hourly condi
                       validation, confirmed by hand
 livecams.json         configuration
 setup.ps1             set up and start (run by "Set up and start LiveCams.bat")
+tests/                automated tests (python -m pytest tests); run on GitHub for every code change
 community/            community IDs: viewers click a box and say what it is (built, not public yet:
                       docs/COMMUNITY.md)
 ```
