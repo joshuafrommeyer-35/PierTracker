@@ -325,7 +325,7 @@ internal sealed class CamWindow : Form
             if (displayFrozen) Log.Write($"[{cam.Name}] display frozen (stream keeps running)");
         }
 
-        if (captureDir != null && advancing && now - lastCapture >= TimeSpan.FromSeconds(cam.CaptureEverySeconds))
+        if (captureDir != null && advancing && now - lastCapture >= CaptureInterval())
         {
             lastCapture = now;
             await CaptureAsync();
@@ -421,6 +421,26 @@ internal sealed class CamWindow : Form
         displayFrozen = false; // a reloaded page has no freeze overlay
         camFrame = null;
         web.CoreWebView2?.Reload();
+    }
+
+    /// <summary>
+    /// Normally captureEverySeconds; every tick (~3 s) while the tracker is following a fish it
+    /// could name. The tracker asks by writing a Unix time to burst_until in the capture folder.
+    /// </summary>
+    private TimeSpan CaptureInterval()
+    {
+        try
+        {
+            string flag = Path.Combine(captureDir!, "burst_until");
+            if (File.Exists(flag) && long.TryParse(File.ReadAllText(flag).Trim(), out long until)
+                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() < until)
+                return TimeSpan.Zero;
+        }
+        catch (IOException)
+        {
+            // the tracker is writing it right now; try again next tick
+        }
+        return TimeSpan.FromSeconds(cam.CaptureEverySeconds);
     }
 
     private async Task CaptureAsync()

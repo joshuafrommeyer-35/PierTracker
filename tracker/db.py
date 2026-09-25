@@ -10,6 +10,7 @@ Tables (see SCHEMA below for every column):
   sightings   what was in a snapshot: one row per animal type per snapshot
   conditions  hourly conditions at the pier (tide, temperatures, El Nino index, ...)
   reviews     answers given in the review window
+  visits      fish followed across frames: one row per visit (arrival to leaving), named from all looks
 
 There are deliberately no views yet: building them (e.g. sightings joined with that hour's
 conditions) is part of the SQL walkthrough (docs/SQL_WALKTHROUGH.md).
@@ -61,6 +62,15 @@ CREATE TABLE IF NOT EXISTS sightings (
 CREATE INDEX IF NOT EXISTS sightings_by_time ON sightings(taken_at);
 CREATE INDEX IF NOT EXISTS sightings_by_animal ON sightings(common_name);
 
+CREATE TABLE IF NOT EXISTS visits (
+    id          INTEGER PRIMARY KEY,
+    started_at  TEXT,     -- first frame the fish was seen in
+    ended_at    TEXT,     -- last frame
+    looks       INTEGER,  -- frames it was seen in (regular + burst)
+    common_name TEXT,     -- named from the average of all looks
+    confidence  REAL
+);
+
 CREATE TABLE IF NOT EXISTS conditions (
     date TEXT, hour INTEGER,
     tide_predicted_m REAL, water_level_m REAL, tide_trend INTEGER,  -- +1 rising, -1 falling
@@ -102,6 +112,14 @@ def record_snapshot(con: sqlite3.Connection, taken_at: str, dark: bool, sighting
         "INSERT INTO sightings (taken_at, common_name, is_school, count, confidence, method) VALUES (?, ?, ?, ?, ?, ?)",
         [(taken_at, s.common.removesuffix(" (school)"), int(s.common.endswith(" (school)")), s.count,
           round(s.confidence, 3), s.method) for s in sightings])
+    con.commit()
+
+
+def record_visit(con: sqlite3.Connection, started_at: str, ended_at: str, looks: int, common_name: str,
+                 confidence: float):
+    """One fish followed across frames, from arrival to leaving."""
+    con.execute("INSERT INTO visits (started_at, ended_at, looks, common_name, confidence) VALUES (?, ?, ?, ?, ?)",
+                (started_at, ended_at, looks, common_name, round(confidence, 3)))
     con.commit()
 
 

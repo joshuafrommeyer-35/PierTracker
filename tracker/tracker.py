@@ -43,6 +43,7 @@ import db
 ROOT = Path(__file__).resolve().parent
 LIVECAMS = ROOT.parent
 FRAME = LIVECAMS / "frames" / "underwater" / "latest.jpg"
+BURST_FLAG = FRAME.parent / "burst_until"  # LiveCams captures faster until this Unix time
 MODELS = ROOT / "models"
 DATA = LIVECAMS / "data"
 SIGHTINGS_CSV = DATA / "sightings.csv"
@@ -51,8 +52,16 @@ HOUR_STATE = DATA / ".current_hour.json"
 CROPS = DATA / "crops"
 REVIEW = DATA / "review" / "pending"
 CAMERA_MODEL = MODELS / "camera_classifier.npz"
+BANK = DATA / "frame_bank"
 
-POLL_SECONDS = 2
+POLL_SECONDS = 1
+REGULAR_SECONDS = 9          # frames closer together than this are burst frames (tracking only, not stats)
+# Following a fish across frames: averaging its ID over a visit was ~5 points more accurate in a test
+# (README). When a fish big enough to name is in view, LiveCams is asked for a frame every ~3 s.
+TRACK_GAP = timedelta(seconds=12)   # a fish unseen this long has left: its visit is recorded
+TRACK_MIN_DISTANCE = 150            # px: how far a fish may move between frames and still be the same one
+BURST_SECONDS = 20
+BURST_BUDGET = timedelta(minutes=10)  # at most this much burst time per hour
 STALE_SECONDS = 60          # a frame older than this means the wallpaper isn't streaming
 DARK_MEAN = 20              # mean brightness (0-255) below which a frame is "night"
 DARK_DETAIL = 4.0           # detail left after blurring; night sensor noise averages away to ~0
@@ -96,6 +105,11 @@ KEEP_PENDING_DAYS = 14      # unreviewed pictures older than this are deleted
 MAX_CROPS = 12
 MIN_CROP_PX = 20
 KEEP_CROPS_DAYS = 14
+# A frame bank for training a detector on this camera later: self-supervised pretraining works
+# best on lots of unlabeled frames from the very same camera (see README). ~20 MB a day.
+BANK_EVERY = timedelta(minutes=20)
+BANK_INTERESTING_EVERY = timedelta(minutes=5)  # frames with a named animal are worth more
+KEEP_BANK_DAYS = 90
 UNLOAD_AFTER = timedelta(minutes=10)  # free the models' ~1 GB at night and while the cams are paused
 CROP_EVERY = timedelta(minutes=10)  # keep one sample crop per animal type per 10 min, for review
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], np.float32)
@@ -356,6 +370,15 @@ class Motion:
         self.last = when
         return self.frames > MOTION_WARMUP
 
+    def peek(self, img: Image.Image):
+        """Motion mask for a burst frame, without updating the background (it's tuned for ~10 s steps)."""
+        if self.background is None:
+            return
+        small = np.asarray(img.convert("L").resize(
+            (img.width // MOTION_SCALE, img.height // MOTION_SCALE), Image.BOX), np.float32)
+        diff = np.abs(small - self.background)
+        self.mask = diff > max(MOTION_MIN_DIFF, 4 * float(np.median(diff)))
+
     def moving_share(self) -> float:
         return float(self.mask.mean())
 
@@ -398,6 +421,24 @@ def components(mask: np.ndarray):
         yield area, (x0 * MOTION_SCALE, y0 * MOTION_SCALE, (x1 + 1) * MOTION_SCALE, (y1 + 1) * MOTION_SCALE)
 
 
+@dataclass
+class Track:
+    """One fish followed across frames. Its name comes from the average of all its looks."""
+    first_seen: datetime
+    last_seen: datetime
+    box: tuple
+    probs_sum: np.ndarray
+    looks: int = 1
+    name: str = ""
+    confidence: float = 0.0
+
+    def near(self, box) -> bool:
+        cx, cy = (self.box[0] + self.box[2]) / 2, (self.box[1] + self.box[3]) / 2
+        bx, by = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+        reach = max(TRACK_MIN_DISTANCE, 1.5 * max(box[2] - box[0], box[3] - box[1]))
+        return (cx - bx) ** 2 + (cy - by) ** 2 <= reach ** 2
+
+
 class Tracker:
     def __init__(self, publish=False):
         self.publish = publish
@@ -414,8 +455,17 @@ class Tracker:
         self.recent_visibility = deque(maxlen=3)
         self.db = db.connect()
         self.scene_first_seen = {}
+        self.last_bank = datetime.min
+        self.tracks = []
+        self.last_regular = None
+        self.bursts = deque()  # start times of recent bursts, for the hourly budget
 
     def process(self, img: Image.Image, when: datetime):
+        self._end_visits(when)
+        if self.last_regular and (when - self.last_regular).total_seconds() < REGULAR_SECONDS:
+            self._burst_frame(img, when)
+            return []
+        self.last_regular = when
         self._roll_hour(when)
         self.hour["analyzed"] += 1
         stamp = when.isoformat(timespec="seconds")
@@ -455,6 +505,7 @@ class Tracker:
             seen[1] = max(seen[1], s.count)
         self._save_hour()
         db.record_snapshot(self.db, stamp, False, sightings, visibility=clarity)
+        self._bank(img, when, sightings)
         if sightings:
             self._append(SIGHTINGS_CSV, SIGHTING_FIELDS, [
                 [when.isoformat(timespec="seconds"), when.date().isoformat(), when.strftime("%H:%M:%S"),
@@ -544,7 +595,12 @@ class Tracker:
             camera = m.camera_name(emb)
             if camera and camera[0] == "not an animal":
                 continue  # learned from people's answers: this kind of thing isn't an animal
+            track = self._follow(box, probs, when)
+            self._request_burst(when)
+            if track.looks > 1:
+                probs = track.probs_sum / track.looks  # the visit's average look: steadier than one frame
             label, prob = camera or m.name(probs, m.fish_idx, species_cut, group_cut)
+            track.name, track.confidence = (label["common"], prob) if label else ("", prob)
             method = "camera-trained" if camera else "zero-shot"
             guesses = top_guesses(m.labels, probs, m.fish_idx)
             if label is None or label.get("group"):
@@ -569,6 +625,60 @@ class Tracker:
         # Five or more of one kind in a snapshot is logged as that kind's school.
         return [Sighting(l["common"] + (" (school)" if n >= SCHOOL_MIN else ""), l["scientific"], l["category"], n, p, how)
                 for n, p, l, how in found.values()]
+
+    # --- following fish across frames ---------------------------------------------------------
+    def _follow(self, box, probs, when: datetime) -> Track:
+        """The visit this fish belongs to: the closest recent track, or a new one."""
+        near = [t for t in self.tracks if when - t.last_seen <= TRACK_GAP and t.near(box)]
+        if near:
+            track = min(near, key=lambda t: (t.box[0] - box[0]) ** 2 + (t.box[1] - box[1]) ** 2)
+            track.box, track.last_seen = tuple(box[:4]), when
+            track.probs_sum = track.probs_sum + probs
+            track.looks += 1
+            return track
+        track = Track(when, when, tuple(box[:4]), probs.copy())
+        self.tracks.append(track)
+        return track
+
+    def _request_burst(self, when: datetime):
+        """Ask LiveCams for a frame every ~3 s for a while, within an hourly budget."""
+        while self.bursts and when - self.bursts[0] > timedelta(hours=1):
+            self.bursts.popleft()
+        if len(self.bursts) * timedelta(seconds=BURST_SECONDS) >= BURST_BUDGET:
+            return
+        if self.bursts and when - self.bursts[-1] < timedelta(seconds=BURST_SECONDS):
+            return  # the current burst is still running
+        self.bursts.append(when)
+        try:
+            BURST_FLAG.write_text(str(int(time.time()) + BURST_SECONDS), encoding="utf-8")
+        except OSError:
+            pass
+
+    def _burst_frame(self, img: Image.Image, when: datetime):
+        """A frame between the regular ones: only used to add looks to the fish being followed."""
+        if not self.tracks or is_dark(img) or visibility(img) < VISIBILITY_POOR:
+            return
+        m = self.models()
+        self.motion.peek(img)
+        for box in m.detect(img):
+            if max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION:
+                continue
+            probs = m.probabilities(m.embed(square_crop(img, box)), m.fish_idx)
+            if any(t.near(box) and when - t.last_seen <= TRACK_GAP for t in self.tracks):
+                self._follow(box, probs, when)
+
+    def _end_visits(self, when: datetime):
+        """Records the fish that have left: one row per visit, named from all its looks."""
+        done = [t for t in self.tracks if when - t.last_seen > TRACK_GAP]
+        self.tracks = [t for t in self.tracks if t not in done]
+        if not done or self._models is None:
+            return
+        m = self._models
+        for t in done:
+            avg = t.probs_sum / t.looks
+            label, prob = m.name(avg, m.fish_idx, SPECIES_MIN_PROB, GROUP_MIN_PROB)
+            db.record_visit(self.db, t.first_seen.isoformat(timespec="seconds"), t.last_seen.isoformat(timespec="seconds"),
+                            t.looks, label["common"] if label else UNIDENTIFIED["common"], prob)
 
     def _queue_review(self, view: Image.Image, frame: Image.Image, box, guesses, when: datetime, logged_as=None,
                       embedding=None):
@@ -617,6 +727,16 @@ class Tracker:
             self._models = None
             gc.collect()
             log.info("models unloaded (idle)")
+
+    def _bank(self, img: Image.Image, when: datetime, sightings):
+        named = [s.common for s in sightings if s.common.removesuffix(" (school)") not in ("small fish", "fish (unidentified)")]
+        if when - self.last_bank < (BANK_INTERESTING_EVERY if named else BANK_EVERY):
+            return
+        self.last_bank = when
+        folder = BANK / when.date().isoformat()
+        folder.mkdir(parents=True, exist_ok=True)
+        tag = "_" + file_safe(named[0]) if named else ""
+        img.save(folder / f"{when:%H%M%S}{tag}.jpg", quality=92)
 
     def _save_crop(self, crop: Image.Image, when: datetime, name: str, prob: float):
         """Saves a sample of what was identified, named <time>_<animal>_<confidence>.jpg, so
@@ -670,6 +790,10 @@ class Tracker:
         cutoff = (now - timedelta(days=KEEP_CROPS_DAYS)).date().isoformat()
         for folder in CROPS.glob("*"):
             if folder.is_dir() and folder.name < cutoff:
+                shutil.rmtree(folder, ignore_errors=True)
+        bank_cutoff = (now - timedelta(days=KEEP_BANK_DAYS)).date().isoformat()
+        for folder in BANK.glob("*"):
+            if folder.is_dir() and folder.name < bank_cutoff:
                 shutil.rmtree(folder, ignore_errors=True)
         stale = (now - timedelta(days=KEEP_PENDING_DAYS)).strftime("%Y%m%d")
         for f in REVIEW.glob("*"):

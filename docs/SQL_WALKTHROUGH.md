@@ -33,6 +33,7 @@ For a point-and-click view, [DB Browser for SQLite](https://sqlitebrowser.org/) 
 | `species` | animal the tracker knows | `common_name`, `scientific_name`, `category`, `look_alike_group` |
 | `conditions` | hour at the pier | `date`, `hour`, `pier_water_temp_c`, `pier_temp_anomaly_c`, `turbidity_ntu`, `tide_predicted_m`, `tide_trend`, `oni` |
 | `reviews` | answer in the review window | `kind`, `logged_as`, `decision`, `answer` |
+| `visits` | fish followed across frames (arrival to leaving) | `started_at`, `ended_at`, `looks`, `common_name`, `confidence` |
 
 `sightings.taken_at` points at `snapshots.taken_at`, and `snapshots.date` + `snapshots.hour` point at
 `conditions`. Those links are what JOINs use.
@@ -240,3 +241,5 @@ Some to try once there are a few weeks of data:
 - How often is the camera too murky to use, and does that line up with the pier's `turbidity_ntu`
   sensor?
 - In the `reviews` table, how often was the tracker's logged name right (`kind = 'check'`), per animal?
+- From `visits`: how long does a kelp bass usually stay (`julianday(ended_at) - julianday(started_at)`,
+  times 86400 for seconds)? Which animals come back most often in a day?

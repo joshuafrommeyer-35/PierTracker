@@ -69,7 +69,10 @@ class NormalizedImageEncoder(torch.nn.Module):
         return F.normalize(self.clip.encode_image(pixels), dim=-1)
 
 
-def export_classifier():
+def export_classifier(labels_only=False):
+    """Converts BioCLIP's image encoder to OpenVINO and embeds every label in species.json.
+    labels_only: skip the slow, memory-hungry conversion and just redo the label embeddings (after
+    editing species.json). Safe while the tracker runs: it reads these files only when loading."""
     clip, _, preprocess = open_clip.create_model_and_transforms(BIOCLIP)
     tokenizer = open_clip.get_tokenizer(BIOCLIP)
     clip.eval()
@@ -79,9 +82,10 @@ def export_classifier():
     normalize = next(t for t in preprocess.transforms if type(t).__name__ == "Normalize")
 
     with torch.no_grad():
-        encoder = NormalizedImageEncoder(clip)
-        ov_model = ov.convert_model(encoder, example_input=torch.zeros(1, 3, size, size))
-        ov.save_model(ov_model, MODELS / "classifier.xml", compress_to_fp16=True)
+        if not labels_only:
+            encoder = NormalizedImageEncoder(clip)
+            ov_model = ov.convert_model(encoder, example_input=torch.zeros(1, 3, size, size))
+            ov.save_model(ov_model, MODELS / "classifier.xml", compress_to_fp16=True)
 
         spec = json.loads((ROOT / "species.json").read_text(encoding="utf-8"))
         labels, embeddings = [], []
@@ -115,7 +119,7 @@ def export_classifier():
 
 if __name__ == "__main__":
     MODELS.mkdir(exist_ok=True)
-    if "--classifier-only" not in sys.argv:
+    if not {"--classifier-only", "--labels-only"} & set(sys.argv):
         export_detector()
-    export_classifier()
+    export_classifier(labels_only="--labels-only" in sys.argv)
     print("done")

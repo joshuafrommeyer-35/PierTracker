@@ -95,7 +95,7 @@ flowchart LR
      precision. Fewer than five are logged as **small fish**.
    - **80 px and up** is cropped and embedded by [BioCLIP 2.5](https://huggingface.co/imageomics/bioclip-2.5-vith14),
      a vision model trained on the Tree of Life that can match an image against species names it has never
-     been fine-tuned on (zero-shot). The crop is compared only with the **fish** in
+     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 57 animals in
      [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
      piling...). So a blurry fish can't come out as an octopus.
    - **Look-alike groups.** Many mistakes are between look-alikes: topsmelt vs. jacksmelt vs. anchovy vs.
@@ -103,12 +103,20 @@ flowchart LR
      of a group (their probabilities add up to **0.90+**), the **group** is logged instead: "silversides &
      sardines", "surfperches", "sea basses", "grunts (salema, sargo)" and so on (see `species.json`).
      Otherwise it's **fish (unidentified)**.
+   - **Following fish across frames.** When a fish big enough to name shows up, LiveCams is asked for
+     a frame every ~3 s for 20 s (at most 10 min of this per hour). Detections close to where the fish
+     was a moment ago are treated as the same fish, and it's named from the **average of all its
+     looks**, which is steadier than any single frame. In a test that was ~5 points more accurate (see
+     Validation). Each fish becomes one row in the database's `visits` table (arrival, departure, looks,
+     name), so individual visits can be counted, not just snapshots. The extra burst frames feed only
+     the naming and the visits, never the snapshot statistics, because bursts happen exactly when fish
+     are around and would inflate them.
    - Once the **camera-trained classifier** has learned from enough review answers (see
      [Learning from the data](#learning-from-the-data)), its answer is used first for the animals it
      knows.
 6. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
    sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
-   lot of it moved, are compared against every label (44 animals + 9 "not an animal"). A "scene" animal
+   lot of it moved, are compared against every label (57 animals + 9 "not an animal"). A "scene" animal
    (marked in `species.json`) counts when it wins with at least 0.70 probability. In a small moving area
    it needs 0.90, or it has to show up again within 30 s: a real lobster stays put, but a flicker of fish
    at a piling edge doesn't.
@@ -289,6 +297,37 @@ Counting holds up far longer than naming, which sets the two cutoffs: hazy below
 too murky below 0.2 (nothing). Real clear frames today score 2.1–3.1. Once there's murky weather, the
 score can be checked against the pier's turbidity sensor (a good SQL exercise).
 
+**Three more ideas, tested the same way:**
+
+| Idea | Result | Used? |
+|---|---|---|
+| Test-time augmentation (classify flipped/re-cropped copies and average) | No gain in accuracy (79% vs 80%), fewer fish named | No |
+| Averaging several looks at the same fish (proxy for following it across frames) | **85% of names right vs 80%**, fewer fish named | **Yes**: burst frames + visits |
+| Local species priors from iNaturalist records near the pier | Not used on its own: iNaturalist reflects what divers photograph (6 sardine records, but sardines school here constantly). The camera-trained classifier learns this camera's real frequencies from review answers instead. | Its species list, yes |
+
+**The species list.** iNaturalist research-grade records within 1.5 km of the pier showed locally
+common fish missing from the list. The model can only answer with names it's given, so a zebra-perch
+swimming by was *forced* into a wrong name. 13 were added (zebra-perch sea chub, giant kelpfish, ocean
+whitefish, rockfishes, croakers, sanddab, lizardfish, greenling, cabezon, grunion, diamond stingray,
+banded guitarfish), for 57 animals. On known-species photos of all 38 species tested:
+
+| Species list | Photos of the original 25 | Photos of the 13 added | All 38 |
+|---|---:|---:|---:|
+| 44 animals | 75% of names right | 11% (no right name available) | 56% |
+| 57 animals | 70% | 82% | **74%** |
+
+The cost is that new labels sometimes "steal" answers: ocean whitefish took 3 and zebra-perch 4 of 456.
+On the live cam, the olive, yellow-tailed schooling fish near the pilings went from mostly
+"blacksmith" to mostly "ocean whitefish". Both are plausible (juvenile blacksmith are blue in front and
+orange-yellow behind; ocean whitefish are blue-grey with yellowish fins), and it can't be settled from
+footage this small. That makes it the most useful question for the review queue.
+
+**Also looked at:**
+- NOAA's [AI for protected species](https://www.fisheries.noaa.gov/new-england-mid-atlantic/science-data/using-artificial-intelligence-study-protected-species)
+  uses the same human-in-the-loop active learning as the review queue.
+- [Li et al. 2025](https://doi.org/10.1109/JOE.2024.3455565) pretrain on unlabeled underwater footage
+  (see Next steps; it's the reason for the frame bank).
+
 These are synthetic tests, closer to the camera than clean photos but not the real thing. The review
 answers are the real measure, and they're what the **Checked** column shows.
 
@@ -325,6 +364,7 @@ which usually beats zero-shot by a wide margin on a specific camera.
 
 Everything the tracker sees also goes into a SQLite database, `data/piertracker.db`, with these tables:
 - `snapshots`: every analyzed frame, with its visibility and whether it was dark or murky
+- `visits`: each fish followed across frames, from arrival to leaving
 - `sightings`
 - `species`
 - `conditions`
@@ -390,7 +430,16 @@ Results are rate ratios per typical (1 SD) change with 95% intervals, in
   of day as detection covariates.
 - **Forecasts:** the odds of a sea lion or a ray in the next hour, given the tide and conditions now.
 - **A detector fine-tuned on this camera's small fish** would count schools much better than the
-  motion-speck estimate.
+  motion-speck estimate. Two pieces of prior work point the way:
+  - **Pretraining on our own footage.** [Li et al. 2025, *Self-Supervised Marine Organism
+    Detection*](https://doi.org/10.1109/JOE.2024.3455565) pretrain a detector's backbone on 40,000
+    *unlabeled* underwater images, with underwater-style augmentations (CLAHE, Retinex, motion blur) used
+    during training, then fine-tune it on a few labels. For that, the tracker banks frames from this
+    camera: one every 20 min, plus one every 5 min while a named animal is in view
+    (`data/frame_bank/`, 90 days).
+  - **Labeling tools.** NOAA's protected-species work uses [VIAME](https://www.viametoolkit.org/) and
+    its DIVE annotation tool, with the same human-in-the-loop active learning as the review queue here.
+    DIVE is a good way to draw boxes on banked frames.
 
 ## Performance
 
@@ -496,6 +545,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/sightings.csv` | Every sighting: one row per animal type per snapshot |
 | `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
+| `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
 | `data/piertracker.db` | The SQLite database: snapshots, sightings, species, conditions, reviews |
 | `sandbox/piertracker_sandbox.db` | Your practice copy (`sql.py`, `.reset` to refresh) |
