@@ -142,7 +142,7 @@ flowchart LR
     M --> C["Moving areas + whole frame<br/>to BioCLIP 2.5: octopus, crab,<br/>jelly, sea lion, diver...?"]
     D -->|"under 80 px"| U["small fish, or one<br/>'small fish (school)'<br/>with a rough size"]
     D -->|"80 px or more"| F["BioCLIP 2.5 names it<br/>(fish names only)"]
-    C -->|sure| G[("data/sightings.csv")]
+    C -->|sure| G[("data/piertracker.db")]
     F -->|sure| G
     U --> G
     C -->|not sure| R["Review window:<br/>picture + top 3 guesses"]
@@ -222,16 +222,16 @@ flowchart LR
 
    Each picture shows the close-up, where it was in the frame, and the top 3 guesses. There are at most
    ~10 an hour. See [Reviewing uncertain sightings](#reviewing-uncertain-sightings).
-8. **Logging.**
-   - `data/sightings.csv` gets one row per animal type per snapshot:
-     `timestamp, date, time, common_name, scientific_name, category, count, confidence, method`.
-     `method` is how it was named: `zero-shot` (BioCLIP), `camera-trained`, or `detector only` (small or
-     unidentified fish).
-   - `data/hourly_summary.csv` rolls these up per hour, with how many snapshots were analyzed and how
-     many were dark.
-   - Five or more of one named kind in a snapshot is logged once as **"<kind> (school)"**, for example
-     "blacksmith (school)", with the count.
-   - Once a day, `tracker/publish_results.py` turns that into the results section above and pushes it.
+8. **Logging.** Everything goes into one place, the SQLite database `data/piertracker.db` (see
+   [The database](#the-database-sql)), where every write is all-or-nothing:
+   - `snapshots`: every analyzed frame, including dark and murky ones, so rates can be computed fairly.
+   - `sightings`: one row per animal type per snapshot, with the count, confidence and `method`: how it
+     was named, `zero-shot` (BioCLIP), `camera-trained`, or `detector only` (small or unidentified fish).
+   - Five or more of one named kind in a snapshot is one row flagged as a school, shown as
+     **"<kind> (school)"**, for example "blacksmith (school)", with the count.
+   - Once a day, `tracker/publish_results.py` summarizes it per hour and per day into the results section
+     above and `results/*.csv`, and pushes them. The statistics start at 2026-09-25 10:01, when the
+     current model took over; earlier snapshots stay in the database.
 
 Both models are converted once to [OpenVINO](https://github.com/openvinotoolkit/openvino) (half
 precision). The running tracker needs only OpenVINO, NumPy and Pillow, not PyTorch. It runs the models on
@@ -632,7 +632,21 @@ How it stays light:
 
 ## Setup
 
-Requirements:
+**The easy way:** double-click **`Set up and start LiveCams.bat`** in this folder. It checks every step and
+skips what's already done, so it's safe to run any time, including after a Windows reset or on a new PC:
+
+1. Installs what's missing with `winget`: Python 3.12, the .NET 8 SDK, Git, the WebView2 runtime.
+2. **Restores your data** from the Google Drive backup if this PC has none. It only fills in missing
+   files and never overwrites anything. If the backup is configured but Drive isn't signed in yet, it
+   stops rather than starting with empty data (which the nightly backup could then copy over the real
+   one). Run it with `-Fresh` to start empty on purpose.
+3. Builds the tracker's Python environment and models if they're missing or broken. The only thing it
+   ever deletes is a `tracker\.venv` that no longer runs, and it rebuilds that.
+4. Builds the app (`-Rebuild` forces it), starts the cams, the tracker and the tray icon (through the
+   Wallpaper Manager if it's in the parent folder), pins the tray icon to the taskbar, and checks you're
+   signed in to GitHub for the nightly results.
+
+**By hand**, the same steps. Requirements:
 - Windows 10 or 11
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) to build the app
 - WebView2 Runtime (preinstalled on Windows 11)
@@ -718,19 +732,19 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 
 | Path | Contents |
 |---|---|
-| `data/sightings.csv` | Every sighting: one row per animal type per snapshot |
-| `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
+| `data/piertracker.db` | **Everything the tracker saw** (SQLite): snapshots, sightings, visits, species, conditions, reviews |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
-| Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`) |
+| Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`). Each file is copied under a temporary name and swapped in, so an interrupted backup leaves the previous one whole, and a PC with less data than the backup (a fresh install that wasn't restored) never overwrites it |
 | `data/background.png` | The long-term background (median of the last hour of clear daylight) that fixed, swaying things are compared with |
 | `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
-| `data/piertracker.db` | The SQLite database: snapshots, sightings, species, conditions, reviews |
 | `sandbox/piertracker_sandbox.db` | Your practice copy (`sql.py`, `.reset` to refresh) |
 | `data/environment_hourly.csv` | Hourly conditions at the pier (NOAA + SCCOOS), temperature anomaly, El Niño index |
 | `data/ml/classifier_report.md` | Latest camera-classifier training report |
 | `logs/nightly.log` | What the nightly job did |
 | `frames/` | The latest tracker frame, and the stills used by `--off` |
+| `frames/underwater/recent/` | The last 10 minutes of frames, with what was ignored as fixed structure in each (to check "did it see that?") |
+| `data/archive/` | Earlier data set aside, never deleted: pre-tuning runs, the CSV logs used before the database, removed fixture sightings |
 | `logs/host.log`, `logs/tracker.log` | What the app and tracker did |
 
 ## Project layout
@@ -753,6 +767,7 @@ tracker/
 results/              published summaries: daily, hourly sightings, hourly conditions,
                       validation, confirmed by hand
 livecams.json         configuration
+setup.ps1             set up and start (run by "Set up and start LiveCams.bat")
 ```
 
 ## Credits

@@ -24,6 +24,7 @@ import csv
 import json
 import shutil
 import sqlite3
+from datetime import datetime
 import sys
 from contextlib import closing
 from pathlib import Path
@@ -31,6 +32,9 @@ from pathlib import Path
 TRACKER = Path(__file__).resolve().parent
 LIVECAMS = TRACKER.parent
 DB_PATH = LIVECAMS / "data" / "piertracker.db"
+# The statistics start here. Earlier snapshots were named by an older model (BioCLIP 2); they stay in
+# the database but are left out of the published numbers and the models.
+STATS_FROM = "2026-09-25T10:01:00"
 SANDBOX = LIVECAMS / "sandbox" / "piertracker_sandbox.db"
 
 SCHEMA = """
@@ -148,6 +152,35 @@ def sync(con: sqlite3.Connection):
                  float(r["best_guess_prob"]) if r["best_guess_prob"] else None)
                 for r in csv.DictReader(f)])
     con.commit()
+
+
+def hourly(con: sqlite3.Connection):
+    """The hourly summary: one row per (date, hour, animal), with that hour's effort (snapshots
+    analyzed, dark, murky) and the animal's snapshots and most at once. An hour with no sightings
+    gets one row with a blank animal. Schools are named "<animal> (school)"."""
+    effort = {(d, h): (n, dark, murky) for d, h, n, dark, murky in con.execute(
+        "SELECT date, hour, COUNT(*), SUM(dark), SUM(murky) FROM snapshots WHERE taken_at >= ? "
+        "GROUP BY date, hour", (STATS_FROM,))}
+    seen = {}
+    for d, h, name, n, most in con.execute(
+            "SELECT p.date, p.hour, g.common_name || CASE WHEN g.is_school THEN ' (school)' ELSE '' END, "
+            "COUNT(DISTINCT g.taken_at), MAX(g.count) "
+            "FROM sightings g JOIN snapshots p ON p.taken_at = g.taken_at "
+            "WHERE p.taken_at >= ? GROUP BY 1, 2, 3", (STATS_FROM,)):
+        seen.setdefault((d, h), []).append((name, n, most))
+    rows = []
+    for (d, h), (n, dark, murky) in sorted(effort.items()):
+        for name, s, most in sorted(seen.get((d, h), [])) or [("", 0, 0)]:
+            rows.append({"date": d, "hour": h, "snapshots_analyzed": n, "snapshots_dark": dark or 0,
+                         "snapshots_murky": murky or 0, "common_name": name, "snapshots_seen": s, "max_count": most})
+    return rows
+
+
+def sighting_times(con: sqlite3.Connection):
+    """(time, animal) of every sighting since STATS_FROM, in time order: for counting encounters."""
+    return [(datetime.fromisoformat(t), name) for t, name in con.execute(
+        "SELECT taken_at, common_name || CASE WHEN is_school THEN ' (school)' ELSE '' END FROM sightings "
+        "WHERE taken_at >= ? ORDER BY taken_at", (STATS_FROM,))]
 
 
 def backfill_sightings(con: sqlite3.Connection):

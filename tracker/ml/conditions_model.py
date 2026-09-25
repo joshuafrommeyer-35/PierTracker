@@ -25,14 +25,18 @@ lingers shows up in neighbouring hours), so the intervals are optimistic. Occupa
 GAMs are the natural next steps once there's a season of data.
 """
 
+import sys
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import db  # noqa: E402
+
 LIVECAMS = Path(__file__).resolve().parent.parent.parent
-SIGHTINGS = LIVECAMS / "data" / "hourly_summary.csv"
 CONDITIONS = LIVECAMS / "data" / "environment_hourly.csv"
 REPORT = LIVECAMS / "results" / "conditions_model.md"
 MIN_DAYS = 21            # days of daylight data before any model is fitted
@@ -49,8 +53,16 @@ PREDICTORS = {
 }
 
 
-def load():
-    sightings = pd.read_csv(SIGHTINGS)
+def hourly_rows():
+    """The hourly summary from the database (db.hourly)."""
+    if not db.DB_PATH.exists():
+        return []
+    with closing(db.connect()) as con:
+        return db.hourly(con)
+
+
+def load(rows=None):
+    sightings = pd.DataFrame(hourly_rows() if rows is None else rows)
     conditions = pd.read_csv(CONDITIONS)
     if "snapshots_murky" not in sightings:
         sightings["snapshots_murky"] = 0
@@ -88,10 +100,11 @@ def fit(table, animal):
 
 def main():
     lines = [f"# What brings animals in? ({datetime.now():%Y-%m-%d})", ""]
-    if not SIGHTINGS.exists() or not CONDITIONS.exists():
+    rows = hourly_rows()
+    if not rows or not CONDITIONS.exists():
         lines.append("No data yet.")
     else:
-        table, animals = load()
+        table, animals = load(rows)
         days = table.date.nunique()
         if days < MIN_DAYS:
             lines.append(f"Waiting for data: {days} of the {MIN_DAYS} days needed before fitting models.")

@@ -1,7 +1,8 @@
 """Publishes the tracker's summary stats to the project's GitHub repo.
 
-Fetches the day's conditions at the pier (environment.py), rolls data/hourly_summary.csv up
-into results/daily_summary.csv, publishes the hourly sightings and conditions side by side
+Fetches the day's conditions at the pier (environment.py), rolls the hourly summary from the
+database (data/piertracker.db, the one place sightings are stored) up into
+results/daily_summary.csv, publishes the hourly sightings and conditions side by side
 (results/hourly_summary.csv, results/environment_hourly.csv; they join on date + hour),
 rewrites the "Tracking results" section of README.md, and commits and pushes if anything
 changed. The tracker runs this once a day when started with --publish; you can
@@ -18,14 +19,14 @@ import statistics
 import subprocess
 import sys
 from collections import defaultdict
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import db
 import environment
 
 ROOT = Path(__file__).resolve().parent.parent
-HOURLY_CSV = ROOT / "data" / "hourly_summary.csv"
-SIGHTINGS_CSV = ROOT / "data" / "sightings.csv"
 RESULTS = ROOT / "results"
 DAILY_CSV = RESULTS / "daily_summary.csv"
 VALIDATION_CSV = RESULTS / "validation.csv"
@@ -46,20 +47,22 @@ NO_WINDOW = 0x08000000
 
 
 def load_hourly():
-    effort = {}                                    # (date, hour) -> (analyzed, dark, murky)
-    species = defaultdict(lambda: [0, 0])          # (date, hour, name) -> [snapshots seen, max count]
-    if not HOURLY_CSV.exists():
-        return effort, species
-    with HOURLY_CSV.open(encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            key = (row["date"], int(row["hour"]))
-            effort[key] = (int(row["snapshots_analyzed"]), int(row["snapshots_dark"]),
-                           int(row.get("snapshots_murky") or 0))
-            if row["common_name"]:
-                s = species[key + (row["common_name"],)]
-                s[0] += int(row["snapshots_seen"])
-                s[1] = max(s[1], int(row["max_count"]))
-    return effort, species
+    """From the database: {(date, hour): (analyzed, dark, murky)}, {(date, hour, name): [seen, most]},
+    and the rows themselves (published as results/hourly_summary.csv)."""
+    effort = {}
+    species = defaultdict(lambda: [0, 0])
+    if not db.DB_PATH.exists():
+        return effort, species, []
+    with closing(db.connect()) as con:
+        rows = db.hourly(con)
+    for row in rows:
+        key = (row["date"], row["hour"])
+        effort[key] = (row["snapshots_analyzed"], row["snapshots_dark"], row["snapshots_murky"])
+        if row["common_name"]:
+            s = species[key + (row["common_name"],)]
+            s[0] += row["snapshots_seen"]
+            s[1] = max(s[1], row["max_count"])
+    return effort, species, rows
 
 
 def load_encounters(effort):
@@ -68,10 +71,10 @@ def load_encounters(effort):
     a kelp bass that hangs around the camera for an hour is one encounter, not 360 snapshots. Only
     hours already in the hourly summary count, so this matches the rest of the numbers."""
     times = defaultdict(list)
-    if SIGHTINGS_CSV.exists():
-        with SIGHTINGS_CSV.open(encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                times[row["common_name"]].append(datetime.fromisoformat(row["timestamp"]))
+    if db.DB_PATH.exists():
+        with closing(db.connect()) as con:
+            for t, name in db.sighting_times(con):
+                times[name].append(t)
     encounters = defaultdict(int)
     for name, stamps in times.items():
         last = None
@@ -450,11 +453,14 @@ def git(*args):
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, creationflags=NO_WINDOW)
 
 
-def publish_hourly(first_day):
-    """Copies the hourly sightings and hourly conditions (from the first tracked day) into results/."""
+def publish_hourly(first_day, hourly_rows):
+    """Writes the hourly sightings and hourly conditions (from the first tracked day) into results/."""
     RESULTS.mkdir(exist_ok=True)
-    if HOURLY_CSV.exists():
-        shutil.copyfile(HOURLY_CSV, RESULTS / "hourly_summary.csv")
+    if hourly_rows:
+        with (RESULTS / "hourly_summary.csv").open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(hourly_rows[0]))
+            w.writeheader()
+            w.writerows(hourly_rows)
     if ENV_CSV.exists() and first_day:
         with ENV_CSV.open(encoding="utf-8") as src, (RESULTS / "environment_hourly.csv").open("w", newline="", encoding="utf-8") as dst:
             reader = csv.DictReader(src)
@@ -464,7 +470,7 @@ def publish_hourly(first_day):
 
 
 def main(push=True, update_environment=True):
-    effort, species = load_hourly()
+    effort, species, hourly_rows = load_hourly()
     days, by_hour = build(effort, species)
     first_day = min(days) if days else None
     if update_environment:
@@ -472,7 +478,7 @@ def main(push=True, update_environment=True):
             environment.update(date.fromisoformat(first_day) if first_day else None)
         except Exception as e:  # conditions are a bonus; never block the daily publish on them
             print(f"could not update conditions: {e}")
-    publish_hourly(first_day)
+    publish_hourly(first_day, hourly_rows)
     if CLASSIFIER_REPORT.exists():
         shutil.copyfile(CLASSIFIER_REPORT, RESULTS / "camera_classifier.md")
     encounters = load_encounters(effort)

@@ -13,6 +13,7 @@ Each step runs even if an earlier one fails, and failures go to logs/nightly.log
 
 import logging
 import logging.handlers
+import os
 import shutil
 import sqlite3
 import sys
@@ -24,10 +25,28 @@ LIVECAMS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
+def copy_safely(src: Path, dest: Path):
+    """Copies under a temporary name, then swaps it in: if the copy is interrupted, the previous
+    backup of that file is still whole."""
+    tmp = dest.with_name(dest.name + ".partial")
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dest)
+
+
+def snapshot_count(path: Path) -> int:
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as con:
+        return con.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
+
+
 def backup(target: Path):
     import db
     target.mkdir(parents=True, exist_ok=True)
     data = LIVECAMS / "data"
+    # A fresh install that wasn't restored first has less than the backup: never overwrite the good
+    # copy with it. setup.bat restores the backup when this PC has no database.
+    kept = target / "piertracker.db"
+    if kept.exists() and snapshot_count(kept) > snapshot_count(db.DB_PATH):
+        raise RuntimeError(f"{kept} has more data than this PC; restore it first (setup.bat). Backup skipped.")
     # The database via SQLite's backup (consistent while the tracker writes), made locally first:
     # synced folders don't like SQLite writing to them directly.
     with tempfile.TemporaryDirectory() as tmp:
@@ -35,17 +54,18 @@ def backup(target: Path):
         # closing(): sqlite3's own "with" commits but doesn't close, which leaves the file locked on Windows
         with closing(db.connect()) as live, closing(sqlite3.connect(copy_path)) as copy:
             live.backup(copy)
-        shutil.copy2(copy_path, target / "piertracker.db")
+        copy_safely(copy_path, target / "piertracker.db")
     for csv_file in data.glob("*.csv"):
-        shutil.copy2(csv_file, target / csv_file.name)
+        copy_safely(csv_file, target / csv_file.name)
     if (data / "review").exists():
-        shutil.copytree(data / "review", target / "review", dirs_exist_ok=True)
+        shutil.copytree(data / "review", target / "review", dirs_exist_ok=True,
+                        copy_function=lambda a, b: copy_safely(Path(a), Path(b)))
     # The frame bank only grows there: copy what's new, never delete.
     for frame in (data / "frame_bank").rglob("*.jpg"):
         dest = target / "frame_bank" / frame.relative_to(data / "frame_bank")
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(frame, dest)
+            copy_safely(frame, dest)
 
 
 def main(publish: bool, backup_dir: str = None):

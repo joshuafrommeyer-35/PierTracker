@@ -4,7 +4,7 @@ Whenever the LiveCams wallpaper saves a new frame (frames/underwater/latest.jpg,
 about every 10 s while the stream plays), this finds fish with the Community Fish
 Detector, names the ones big enough to identify with BioCLIP 2, looks at whatever
 else moved for animals the fish detector won't box (octopus, crabs, jellies, sea
-lions, divers...), and appends what it saw to data/sightings.csv. The camera never
+lions, divers...), and records what it saw in the database (data/piertracker.db). The camera never
 moves, so anything that doesn't move (pilings, the hanging rope, the growth on them)
 is ignored. Sightings it isn't sure about are saved to data/review/pending for a
 person to approve or correct.
@@ -18,13 +18,13 @@ new frames arrive and this just sleeps.
 Needs the files made by setup_models.py.
 """
 
-import csv
 import ctypes
 import gc
 import io
 import json
 import logging
 import logging.handlers
+import os
 import shutil
 import subprocess
 import sys
@@ -44,11 +44,14 @@ ROOT = Path(__file__).resolve().parent
 LIVECAMS = ROOT.parent
 FRAME = LIVECAMS / "frames" / "underwater" / "latest.jpg"
 BURST_FLAG = FRAME.parent / "burst_until"  # LiveCams captures faster until this Unix time
+# The last few minutes of daylight frames, so "did it see that?" can be answered afterwards: with a
+# .json next to a frame listing what was ignored there as fixed structure.
+RECENT = FRAME.parent / "recent"
+KEEP_RECENT = timedelta(minutes=10)
 MODELS = ROOT / "models"
 DATA = LIVECAMS / "data"
-SIGHTINGS_CSV = DATA / "sightings.csv"
-HOURLY_CSV = DATA / "hourly_summary.csv"
 HOUR_STATE = DATA / ".current_hour.json"
+STOP_FILE = LIVECAMS / "tracker.stop"  # LiveCams creates this to ask the tracker to exit cleanly
 CROPS = DATA / "crops"
 REVIEW = DATA / "review" / "pending"
 CAMERA_MODEL = MODELS / "camera_classifier.npz"
@@ -124,10 +127,6 @@ CROP_EVERY = timedelta(minutes=10)  # keep one sample crop per animal type per 1
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], np.float32)
 
-SIGHTING_FIELDS = ["timestamp", "date", "time", "common_name", "scientific_name", "category", "count", "confidence",
-                   "method"]
-HOURLY_FIELDS = ["date", "hour", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name",
-                 "snapshots_seen", "max_count"]
 UNIDENTIFIED = {"common": "fish (unidentified)", "scientific": "", "category": "fish"}
 SMALL_FISH = {"common": "small fish", "scientific": "", "category": "fish"}
 
@@ -525,6 +524,7 @@ class Tracker:
 
     def process(self, img: Image.Image, when: datetime):
         self._end_visits(when)
+        self._keep_recent(img, when)
         if self.last_regular and (when - self.last_regular).total_seconds() < REGULAR_SECONDS:
             self._burst_frame(img, when)
             return []
@@ -571,10 +571,6 @@ class Tracker:
         self._save_hour()
         db.record_snapshot(self.db, stamp, False, sightings, visibility=clarity)
         self._bank(img, when, sightings)
-        if sightings:
-            self._append(SIGHTINGS_CSV, SIGHTING_FIELDS, [
-                [when.isoformat(timespec="seconds"), when.date().isoformat(), when.strftime("%H:%M:%S"),
-                 s.common, s.scientific, s.category, s.count, f"{s.confidence:.2f}", s.method] for s in sightings])
         log.info("%s: %s (%.2fs%s%s)", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing",
                  time.perf_counter() - started, ", poor visibility" if poor else "",
@@ -616,6 +612,10 @@ class Tracker:
         views = [b for b in self.motion.blobs(BLOB_MIN_PX) if all(iou(b, f) < 0.3 for f in fish_boxes + fixtures)]
         swaying = [b for b in views[:MAX_BLOBS] if self.background.is_fixture(img, b)]
         self.fixtures_ignored = len(fixtures) + len(swaying)
+        if fixtures or swaying:
+            (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(
+                {"ignored_fish_boxes": [[round(v) for v in b[:4]] for b in fixtures],
+                 "ignored_moving_areas": [[round(v) for v in b[:4]] for b in swaying]}), encoding="utf-8")
         views = [b for b in views[:MAX_BLOBS] if b not in swaying]
         views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION else []
         whole_frame_animal = None
@@ -810,6 +810,19 @@ class Tracker:
             gc.collect()
             log.info("models unloaded (idle)")
 
+    @staticmethod
+    def _keep_recent(img: Image.Image, when: datetime):
+        """Keeps this frame for 10 minutes (daylight only), dropping older ones."""
+        if is_dark(img):
+            return
+        RECENT.mkdir(parents=True, exist_ok=True)
+        img.save(RECENT / f"{when:%H%M%S}.jpg", quality=80)
+        cutoff = (when - KEEP_RECENT).strftime("%H%M%S")
+        for old in RECENT.iterdir():
+            # names are times of day; after midnight everything from yesterday evening is older anyway
+            if old.stem < cutoff or old.stem > when.strftime("%H%M%S"):
+                old.unlink(missing_ok=True)
+
     def _bank(self, img: Image.Image, when: datetime, sightings):
         named = [s.common for s in sightings if s.common.removesuffix(" (school)") not in ("small fish", "fish (unidentified)")]
         if when - self.last_bank < (BANK_INTERESTING_EVERY if named else BANK_EVERY):
@@ -847,17 +860,17 @@ class Tracker:
         h = self.hour
         if (h["date"], h["hour"]) == (when.date().isoformat(), when.hour):
             return
-        if h["analyzed"]:
-            murky = h.get("murky", 0)
-            rows = [[h["date"], h["hour"], h["analyzed"], h["dark"], murky, name, seen, most]
-                    for name, (seen, most) in sorted(h["species"].items())]
-            self._append(HOURLY_CSV, HOURLY_FIELDS,
-                         rows or [[h["date"], h["hour"], h["analyzed"], h["dark"], murky, "", 0, 0]])
         if h["date"] != when.date().isoformat():
             # New day: the nightly job (conditions, retraining from review answers, the conditions
             # model, and the public README if enabled). Idle priority, no waiting.
             args = [sys.executable, str(ROOT / "nightly.py")] + (["--publish"] if self.publish else []) +                 (["--backup", self.backup] if self.backup else [])
-            subprocess.Popen(args, cwd=ROOT, creationflags=0x08000000 | 0x40)  # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS
+            # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS | CREATE_BREAKAWAY_FROM_JOB: outside LiveCams' job object,
+            # so quitting LiveCams at midnight doesn't cut the backup or publish off halfway.
+            flags = 0x08000000 | 0x40
+            try:
+                subprocess.Popen(args, cwd=ROOT, creationflags=flags | 0x01000000)
+            except OSError:  # not in a job, or the job doesn't allow breaking away
+                subprocess.Popen(args, cwd=ROOT, creationflags=flags)
             log.info("new day: nightly job started")
         self.hour = self._new_hour(when)
         if when - self.last_prune > timedelta(hours=6):
@@ -865,7 +878,14 @@ class Tracker:
             self._prune_crops(when)
 
     def _save_hour(self):
-        HOUR_STATE.write_text(json.dumps(self.hour), encoding="utf-8")
+        # Written to a temporary file, then swapped in: an interruption leaves the old one intact.
+        tmp = HOUR_STATE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.hour), encoding="utf-8")
+        os.replace(tmp, HOUR_STATE)
+
+    def close(self):
+        self._save_hour()
+        self.db.close()
 
     @staticmethod
     def _prune_crops(now: datetime):
@@ -881,26 +901,6 @@ class Tracker:
         for f in REVIEW.glob("*"):
             if f.name[:8] < stale:
                 f.unlink(missing_ok=True)
-
-    @staticmethod
-    def _append(path: Path, fields, rows):
-        if path.exists():
-            with path.open(encoding="utf-8") as f:
-                old_fields = next(csv.reader(f), [])
-            if old_fields != fields:  # written by an older version: add the new columns, blank
-                with path.open(encoding="utf-8") as f:
-                    old = list(csv.DictReader(f))
-                with path.open("w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fields)
-                    writer.writeheader()
-                    writer.writerows({k: r.get(k, "") for k in fields} for r in old)
-        new = not path.exists()
-        with path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if new:
-                writer.writerow(fields)
-            writer.writerows(rows)
-
 
 def enter_efficiency_mode():
     """Windows Efficiency mode (idle priority + EcoQoS) for this process. LiveCams sets it on
@@ -930,7 +930,8 @@ def main():
     backup = sys.argv[sys.argv.index("--backup") + 1] if "--backup" in sys.argv else None
     tracker = Tracker(publish="--publish" in sys.argv, backup=backup)
     last_mtime = None
-    while True:
+    STOP_FILE.unlink(missing_ok=True)  # left over from a crash
+    while not STOP_FILE.exists():
         try:
             mtime = FRAME.stat().st_mtime
             if mtime != last_mtime:
@@ -944,6 +945,8 @@ def main():
         except Exception:
             log.exception("frame failed")
         time.sleep(POLL_SECONDS)
+    tracker.close()
+    log.info("stopped (asked by LiveCams)")
 
 
 if __name__ == "__main__":

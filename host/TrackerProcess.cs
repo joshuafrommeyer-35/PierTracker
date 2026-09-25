@@ -43,6 +43,10 @@ internal sealed class TrackerProcess
 
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+    // Lets the tracker start its nightly job outside the job, so a quit at midnight can't cut the
+    // backup or publish off halfway (the nightly job ends by itself after a few minutes).
+    private const uint JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x800;
+    private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
 
     private static readonly IntPtr KillOnExitJob = CreateKillOnExitJob();
 
@@ -50,7 +54,7 @@ internal sealed class TrackerProcess
     {
         IntPtr job = CreateJobObject(IntPtr.Zero, null);
         var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
         SetInformationJobObject(job, JobObjectExtendedLimitInformation, ref info, Marshal.SizeOf(info));
         return job; // deliberately never closed: the OS closes it when LiveCams exits
     }
@@ -58,6 +62,7 @@ internal sealed class TrackerProcess
     private readonly string python;
     private readonly string script;
     private readonly string workDir;
+    private readonly string stopFile;
     private readonly bool publish;
     private readonly string? backupDir;
     private Process? process;
@@ -68,6 +73,7 @@ internal sealed class TrackerProcess
         python = Path.GetFullPath(Path.Combine(configDir, config.Python));
         script = Path.GetFullPath(Path.Combine(configDir, config.Script));
         workDir = Path.GetDirectoryName(script)!;
+        stopFile = Path.Combine(configDir, "tracker.stop"); // the tracker exits cleanly when this appears
         publish = config.PublishResults;
         backupDir = config.BackupDir;
     }
@@ -114,18 +120,35 @@ internal sealed class TrackerProcess
         Start();
     }
 
+    /// <summary>
+    /// Asks the tracker to stop: it finishes the frame it's on, saves, closes the database and exits.
+    /// Only if it hasn't within 10 s is it killed.
+    /// </summary>
     public void Stop()
     {
         if (process is not { HasExited: false }) return;
         try
         {
-            process.Kill(entireProcessTree: true);
-            process.WaitForExit(5000);
-            Log.Write("tracker stopped");
+            File.WriteAllText(stopFile, "");
+            if (process.WaitForExit(StopWait))
+            {
+                Log.Write("tracker stopped");
+            }
+            else
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+                Log.Write("tracker didn't stop in time; killed");
+            }
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            // already gone
+            // already gone, or the stop file couldn't be written: make sure it's gone
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+        }
+        finally
+        {
+            try { File.Delete(stopFile); } catch (IOException) { }
         }
     }
 }
