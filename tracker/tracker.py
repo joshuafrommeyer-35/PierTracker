@@ -53,6 +53,7 @@ CROPS = DATA / "crops"
 REVIEW = DATA / "review" / "pending"
 CAMERA_MODEL = MODELS / "camera_classifier.npz"
 BANK = DATA / "frame_bank"
+BACKGROUND_IMAGE = DATA / "background.png"
 
 POLL_SECONDS = 1
 REGULAR_SECONDS = 9          # frames closer together than this are burst frames (tracking only, not stats)
@@ -94,6 +95,13 @@ BOX_MIN_MOTION = 0.10       # a detection needs this share of its area to have m
 BLOB_MIN_PX = 90            # moving areas smaller than this are small fish, not a new kind of animal
 MAX_BLOBS = 4               # biggest moving areas checked per frame
 SCENE_MIN_MOTION = 0.15     # the whole frame is checked for a big animal when this much of it moved
+# Fixed things that sway in the surge (growth hanging off the crossbeam, growth on a piling) move
+# enough to pass the motion checks, and got named "leopard shark" or "green sea turtle 100%". They
+# are part of the long-term background; a passing animal isn't. See Background.
+BACKGROUND_EVERY = timedelta(minutes=5)  # one clear daylight frame every 5 minutes...
+BACKGROUND_FRAMES = 12                   # ...over the last hour; the background is their median
+BACKGROUND_MIN_FRAMES = 4
+FIXTURE_CORR = 0.85         # a crop this alike to the background at the same spot is structure
 CAMERA_MIN_PROB = 0.70      # the camera-trained classifier's answer is used when it's at least this sure
 REVIEW_FISH_PROB = 0.25     # an unidentified (big enough) fish whose best guess is at least this goes to review
 REVIEW_SCENE_PROB = 0.40    # a non-fish/big-animal guess between this and SCENE_MIN_PROB goes to review
@@ -290,14 +298,22 @@ def iou(a, b):
     return inter / union if union > 0 else 0.0
 
 
-def square_crop(img: Image.Image, box, pad=0.15):
+def square_box(img: Image.Image, box, pad=0.15):
     """The box, padded and made square so the classifier doesn't see a squashed fish. Near an
     edge the square slides inward rather than filling with black."""
     x0, y0, x1, y1 = box[:4]
     side = min(max(x1 - x0, y1 - y0) * (1 + 2 * pad), img.width, img.height)
     left = min(max((x0 + x1 - side) / 2, 0), img.width - side)
     top = min(max((y0 + y1 - side) / 2, 0), img.height - side)
-    return img.crop((int(left), int(top), int(left + side), int(top + side)))
+    return int(left), int(top), int(left + side), int(top + side)
+
+
+def square_crop(img: Image.Image, box, pad=0.15):
+    return img.crop(square_box(img, box, pad))
+
+
+def standardize(a: np.ndarray) -> np.ndarray:
+    return (a - a.mean()) / (a.std() + 1e-6)
 
 
 def top_guesses(labels, probs, subset=None, n=3):
@@ -440,6 +456,48 @@ class Track:
         return (cx - bx) ** 2 + (cy - by) ** 2 <= reach ** 2
 
 
+class Background:
+    """The scene's long-term look: the median of one clear daylight frame every 5 minutes over the
+    last hour (grey, half size). Pilings and whatever grows or hangs on them are in it; a passing
+    animal isn't, since it's somewhere else in most of the samples. So a crop that looks like the
+    same spot of this image is structure moving in the surge, not an animal. On the 68 review
+    pictures from 2026-09-25 this caught 16 of 17 such fixtures and none of 51 real fish (README,
+    "Fixed things that sway"). An animal that stays put for half an hour or more becomes part of
+    the background too; its visit is logged before that."""
+
+    def __init__(self):
+        self.samples = deque(maxlen=BACKGROUND_FRAMES)
+        self.last = datetime.min
+        self.median = None
+        try:
+            self.median = Image.open(BACKGROUND_IMAGE).convert("L")  # from before a restart
+        except OSError:
+            pass
+
+    def add(self, img: Image.Image, when: datetime):
+        if when - self.last < BACKGROUND_EVERY:
+            return
+        self.last = when
+        small = img.convert("L").resize((img.width // 2, img.height // 2), Image.BOX)
+        self.samples.append(np.asarray(small, np.uint8))
+        if len(self.samples) >= BACKGROUND_MIN_FRAMES:
+            self.median = Image.fromarray(np.median(np.stack(self.samples), axis=0).astype(np.uint8))
+            self.median.save(BACKGROUND_IMAGE)
+
+    def is_fixture(self, img: Image.Image, box) -> bool:
+        """Does the square the classifier would see look like the background there? Allows two
+        pixels (of 32) of sway either way."""
+        if self.median is None:
+            return False
+        x0, y0, x1, y1 = square_box(img, box)
+        sx, sy = self.median.width / img.width, self.median.height / img.height
+        now = np.asarray(img.crop((x0, y0, x1, y1)).convert("L").resize((36, 36), Image.BOX), np.float32)
+        bg = np.asarray(self.median.crop((x0 * sx, y0 * sy, x1 * sx, y1 * sy)).resize((36, 36), Image.BOX), np.float32)
+        now = standardize(now[2:34, 2:34])
+        best = max(float((now * standardize(bg[y:y + 32, x:x + 32])).mean()) for y in range(5) for x in range(5))
+        return best >= FIXTURE_CORR
+
+
 class Tracker:
     def __init__(self, publish=False, backup=None):
         self.publish = publish
@@ -453,6 +511,8 @@ class Tracker:
         self.last_review = {"uncertain": {}, "check": {}}
         self.review_times = {"uncertain": deque(), "check": deque()}
         self.motion = Motion()
+        self.background = Background()
+        self.fixtures_ignored = 0
         self.murky = False
         self.recent_visibility = deque(maxlen=3)
         self.db = db.connect()
@@ -501,6 +561,8 @@ class Tracker:
             self._save_hour()
             db.record_snapshot(self.db, stamp, False, [], visibility=clarity)
             return []  # still learning what the empty scene looks like
+        if not poor:
+            self.background.add(img, when)
         sightings = self._identify(img, when, poor)
         for s in sightings:
             seen = self.hour["species"].setdefault(s.common, [0, 0])
@@ -513,9 +575,10 @@ class Tracker:
             self._append(SIGHTINGS_CSV, SIGHTING_FIELDS, [
                 [when.isoformat(timespec="seconds"), when.date().isoformat(), when.strftime("%H:%M:%S"),
                  s.common, s.scientific, s.category, s.count, f"{s.confidence:.2f}", s.method] for s in sightings])
-        log.info("%s: %s (%.2fs%s)", when.strftime("%H:%M:%S"),
+        log.info("%s: %s (%.2fs%s%s)", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing",
-                 time.perf_counter() - started, ", poor visibility" if poor else "")
+                 time.perf_counter() - started, ", poor visibility" if poor else "",
+                 f", {self.fixtures_ignored} fixed thing(s) ignored" if self.fixtures_ignored else "")
         return sightings
 
     def _identify(self, img: Image.Image, when: datetime, poor=False):
@@ -539,6 +602,10 @@ class Tracker:
         # pilings or the rope hanging from the pier, and those never move.
         fish_boxes = [b for b in m.detect(img)
                       if min(b[2] - b[0], b[3] - b[1]) >= MIN_CROP_PX and self.motion.fraction(b) >= BOX_MIN_MOTION]
+        # ...and the growth hanging there, which does move (it sways) but is part of the background.
+        fixtures = [b for b in fish_boxes
+                    if max(b[2] - b[0], b[3] - b[1]) >= MIN_NAME_PX and self.background.is_fixture(img, b)]
+        fish_boxes = [b for b in fish_boxes if b not in fixtures]
 
         # 1. Everything that isn't a fish the detector found (octopus, crabs, lobsters, jellies, sea
         #    lions, rays, divers...): look at what moved. Each moving area bigger than a small fish,
@@ -546,8 +613,11 @@ class Tracker:
         #    counts when a "scene" animal wins with at least SCENE_MIN_PROB; a close call goes to
         #    the review queue.
         full = (0, 0, img.width, img.height)
-        views = [b for b in self.motion.blobs(BLOB_MIN_PX) if all(iou(b, f) < 0.3 for f in fish_boxes)]
-        views = views[:MAX_BLOBS] + ([full] if self.motion.moving_share() >= SCENE_MIN_MOTION else [])
+        views = [b for b in self.motion.blobs(BLOB_MIN_PX) if all(iou(b, f) < 0.3 for f in fish_boxes + fixtures)]
+        swaying = [b for b in views[:MAX_BLOBS] if self.background.is_fixture(img, b)]
+        self.fixtures_ignored = len(fixtures) + len(swaying)
+        views = [b for b in views[:MAX_BLOBS] if b not in swaying]
+        views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION else []
         whole_frame_animal = None
         for box in views:
             view = img if box == full else square_crop(img, box)
@@ -666,7 +736,8 @@ class Tracker:
         m = self.models()
         self.motion.peek(img)
         for box in m.detect(img):
-            if max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION:
+            if (max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION
+                    or self.background.is_fixture(img, box)):
                 continue
             probs = m.probabilities(m.embed(square_crop(img, box)), m.fish_idx)
             if any(t.near(box) and when - t.last_seen <= TRACK_GAP for t in self.tracks):

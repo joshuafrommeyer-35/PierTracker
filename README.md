@@ -161,6 +161,14 @@ flowchart LR
    covering roughly the last 100 seconds, and marks what changed. Pilings, the rope hanging from the pier
    and the growth on them never move. The live test showed they are the main source of false sightings,
    so anything that didn't move is ignored.
+   - **Fixed things that sway.** Some structure does move: growth hanging off the crossbeam and a round
+     growth on the right-hand piling sway in the surge, and the model named them with high confidence
+     ("leopard shark", "green sea turtle 100%"). So the tracker also keeps a **long-term background**:
+     the median of one clear frame every 5 minutes over the last hour. A passing animal isn't in it
+     (it's somewhere else in most of those frames), but everything fixed is. A crop that looks like the
+     same spot of the long-term background (correlation of 0.85 or more on a 32×32 grey copy, allowing
+     a little sway) is ignored as structure. An animal that stays in one place for half an hour or more
+     fades into the background too; its visit has been logged by then. See Validation, section 4.
 5. **Fish.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
    (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) boxes fish above 0.35 confidence, and
    only boxes where something moved are kept.
@@ -452,7 +460,30 @@ answers are the real measure, and they're what the **Checked** column shows.
 That last row is why every name in the results carries a **Checked** column, and why the review window
 samples confident names too. Until people check them, the names are the model's guesses.
 
-### 4. Ongoing hand-checks on live footage
+### 4. Things that sway: an audit of the first day's rare sightings
+
+The rarer names from the first live day were checked by eye against their saved crops, review pictures
+and frame-bank frames. Most were real fish (some with a doubtful species). But **every confident sighting
+of a big or unusual animal came from two fixed things swaying in the surge**:
+- growth hanging off the crossbeam, logged as giant sea bass, leopard shark, shovelnose guitarfish, rays
+  and kelp bass;
+- a round growth on the right-hand piling, unchanged from 7:00 to at least 11:40, logged as sheep crab
+  and green sea turtle (up to 100%).
+
+They moved enough to pass the motion check, and the model was sure of itself (90–100%). A rule of "same
+place, similar look, again later" wasn't safe: different real fish passing the same spot looked as much
+alike (up to 0.80) as a fixture did to itself (0.76–0.91). What does separate them is the long-term
+background (step 4 of "How the tracker finds and names animals"). On that day's 70 review pictures:
+
+| | Ignored as structure |
+|---|---:|
+| Fixtures and empty water (17) | 16 |
+| Real fish (51) | **0** |
+| The spiny lobster that sat at the piling edge for over half an hour (2) | 2, after it had been logged |
+
+The one fixture missed was a half-visible crop at the edge of the frame.
+
+### 5. Ongoing hand-checks on live footage
 
 Clear reference photos flatter any model. The real test is the live cam, which is often green and murky.
 So the tracker keeps **one sample crop per animal type every 10 minutes** in `data/crops/<date>/`, named
@@ -467,7 +498,7 @@ in the results above. Precision is the share of names that were right. The talli
 [`results/validation.csv`](results/validation.csv) even after old crops are deleted (after 14 days).
 Until some days are checked, the results section says the names are unverified.
 
-### 5. Uncertain sightings, checked by a person
+### 6. Uncertain sightings, checked by a person
 
 The review window is the main check. Answers to **"Is this right?"** pictures become the **Checked**
 column and the **Validation** table. **"Not sure"** pictures that a person approves are listed in
@@ -672,6 +703,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
 | Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`) |
+| `data/background.png` | The long-term background (median of the last hour of clear daylight) that fixed, swaying things are compared with |
 | `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
 | `data/piertracker.db` | The SQLite database: snapshots, sightings, species, conditions, reviews |
