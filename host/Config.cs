@@ -53,6 +53,12 @@ internal sealed class AppConfig
     /// <summary>Unload the cams (leaving a still) while a game or other app runs full-screen.</summary>
     public bool PauseDuringFullscreenApps { get; set; } = true;
 
+    /// <summary>
+    /// Full-screen programs that don't pause the cams: browsers, so watching a video (or this very camera)
+    /// full-screen doesn't blind the tracker. Games, and anything in exclusive full-screen, still do.
+    /// </summary>
+    public List<string> NotGames { get; set; } = new() { "chrome", "msedge", "firefox", "brave", "opera", "vivaldi" };
+
     public TrackerConfig Tracker { get; set; } = new();
 
     /// <summary>

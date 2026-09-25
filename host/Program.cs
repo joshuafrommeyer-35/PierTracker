@@ -287,7 +287,7 @@ internal sealed class LiveCamsApp : ApplicationContext
     {
         if (!config.PauseDuringFullscreenApps) return;
         var now = DateTime.UtcNow;
-        if (Native.FullscreenAppRunning())
+        if (Native.FullscreenAppRunning(config.NotGames))
         {
             lastFullscreenSeen = now;
             if (gameMode) return;
@@ -329,7 +329,7 @@ internal sealed class LiveCamsApp : ApplicationContext
         paused = false;
         RemoteControl.ClearPausedFlag();
         Log.Write("resumed (cams + tracker)");
-        if (config.PauseDuringFullscreenApps && Native.FullscreenAppRunning())
+        if (config.PauseDuringFullscreenApps && Native.FullscreenAppRunning(config.NotGames))
         {
             gameMode = true; // a game is still up: the cams wake when it closes
             lastFullscreenSeen = DateTime.UtcNow;

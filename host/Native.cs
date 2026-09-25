@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -222,7 +223,9 @@ internal static class Native
     }
 
     /// <summary>True while a game or other app runs full-screen (exclusive or borderless).</summary>
-    public static bool FullscreenAppRunning()
+    /// <param name="notGames">Programs that don't count when they're full-screen (browsers: someone
+    /// watching a video, maybe this very camera, isn't gaming and shouldn't blind the tracker).</param>
+    public static bool FullscreenAppRunning(ICollection<string>? notGames = null)
     {
 #if DEBUG
         if (File.Exists(Path.Combine(AppContext.BaseDirectory, "simulate-fullscreen"))) return true; // for testing game mode
@@ -231,7 +234,8 @@ internal static class Native
         // 2 = QUNS_BUSY (full-screen app), 3 = QUNS_RUNNING_D3D_FULL_SCREEN, 4 = QUNS_PRESENTATION_MODE
         if (SHQueryUserNotificationState(out int state) == 0)
         {
-            if (state is 2 or 3 or 4) return true;
+            if (state == 3) return true;  // exclusive full-screen Direct3D: a game
+            if (state is 2 or 4) return !ForegroundIsOneOf(notGames);
             if (state == 1) return false;
         }
 
@@ -239,7 +243,7 @@ internal static class Native
         IntPtr fg = GetForegroundWindow();
         if (fg == IntPtr.Zero) return false;
         GetWindowThreadProcessId(fg, out uint pid);
-        if (pid == (uint)Environment.ProcessId) return false;
+        if (pid == (uint)Environment.ProcessId || ForegroundIsOneOf(notGames)) return false;
         var cls = new StringBuilder(64);
         GetClassName(fg, cls, cls.Capacity);
         // CoreWindow = Start menu, search, lock screen: full-screen shell surfaces, not apps.
@@ -247,6 +251,23 @@ internal static class Native
         if (DwmGetWindowAttribute(fg, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT r, Marshal.SizeOf<RECT>()) != 0) return false;
         var rect = r.ToRectangle();
         return Screen.AllScreens.Any(s => s.Bounds == rect);
+    }
+
+    private static bool ForegroundIsOneOf(ICollection<string>? programs)
+    {
+        if (programs == null || programs.Count == 0) return false;
+        IntPtr fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero) return false;
+        GetWindowThreadProcessId(fg, out uint pid);
+        try
+        {
+            using var p = Process.GetProcessById((int)pid);
+            return programs.Contains(p.ProcessName, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false;  // it just closed
+        }
     }
 
     /// <summary>Re-applies the current static wallpaper so Explorer repaints the desktop.</summary>

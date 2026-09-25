@@ -766,6 +766,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `cams[].captureEverySeconds` / `captureDir` | Save a frame for the tracker this often |
 | `watchedIdleSeconds` / `coverThreshold` | What counts as "someone is looking" |
 | `pauseDuringFullscreenApps` | Unload the cams during games and other full-screen apps |
+| `notGames` | Full-screen programs that don't pause the cams (default: browsers, so watching the cam itself full-screen doesn't blind the tracker) |
 | `reviewReminderHours` / `reviewReminderMinPending` | Review notification at most this often (default 24 h; 0 = tray dot only), and only with at least this many waiting (default 10) |
 | `tracker.enabled` / `publishResults` | Run the tracker; push daily results to GitHub |
 | `tracker.backupDir` | Folder for the nightly backup (e.g. on Google Drive); leave out for none |
