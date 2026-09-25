@@ -4,8 +4,8 @@ Anyone watching can click a box the tracker drew around an animal and say what t
 Each answer is saved with the tracker's own picture of that moment and goes to a Google Sheet where
 every row has a **Reviewed by expert** checkbox.
 
-Status: built and tested on this PC (2026-09-25). **Not public**: it needs the camera owners' OK first
-(see [Permission](#permission)).
+Status: built and tested on this PC (2026-09-25). **Parked** until the live player can be embedded: it
+needs the camera owners' OK first (see [Permission](#permission)). Then: Google Sheet setup, hosting, go live.
 
 ## Pieces
 
@@ -70,30 +70,14 @@ re-broadcasting their footage, so this project doesn't. The ways forward:
 
 1. **Ask** the Scripps Coastal Observing lab (CoOL, who run pierviz) and/or HDOnTap. A community-science
    overlay fits their outreach, and there are two easy yeses they could give: add this site to the
-   embed list, or host the page on their own site (already on the list). Draft below.
+   embed list, or host the page on their own site (already on the list).
 2. **Without permission**, still possible: publish only the tracker's own data (names, times, counts;
    already public in the README), and link to the official live page. The ID tool could then work as a
    "second screen": the official stream open in one window, and in another a simple outline of the
    scene (drawn by us, not footage) with the live boxes on it. The pictures stay private to the review
    Sheet. Clunkier, but needs nobody's OK.
 
-### Draft email
-
-> **Subject:** A community-science idea for the Under Scripps Pier camera
->
-> Hi CoOL team,
->
-> I've been running an open-source project, PierTracker (github.com/joshuafrommeyer-35/PierTracker),
-> that watches the Under Scripps Pier camera and logs the animals it sees (species, times, counts, with
-> the pier's temperature, tide and turbidity), with every uncertain sighting reviewed by a person. It
-> publishes daily summaries; no footage is republished.
->
-> I'd like to add a community-science page where viewers click a box the tracker drew and say what they
-> think it is, with an expert reviewing every answer. It needs the live player on the page, and the
-> HDOnTap embed is limited to your sites. Would you be open to either adding [site] to the embed list,
-> or hosting the page on one of your sites? Happy to share the code, the data, or anything useful to you.
->
-> Thanks for running the camera. It's been fun and a great way to learn.
+A draft email to the lab is kept locally (not in this public repo).
 
 ## Hosting (when it's time)
 
@@ -111,7 +95,7 @@ Never: port-forwarding on the home router, or running the server as an administr
 
 ## Next steps
 
-1. Email CoOL/HDOnTap (draft above).
+1. Email CoOL (the lab that runs the camera), also about volunteering.
 2. Set up the Google Sheet (above) and test with a few answers from this PC.
 3. With a yes: pick hosting (Scripps's site, or Cloudflare Pages + Worker), set `host`/`showTrackerFrames`
    accordingly, and have LiveCams start `server.py` with the tracker.

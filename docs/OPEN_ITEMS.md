@@ -22,12 +22,12 @@ These are built and switch themselves on; they only need time or answers.
   none). **Next:** run it in shadow mode (logged next to the live names, not used) and switch it on
   only if it beats the current names on the review answers.
 
-## Built, not live
+## Built, parked
 
 - **Community IDs** ([COMMUNITY.md](COMMUNITY.md)): viewers click a tracker box and say what it is; answers
   go to a Google Sheet with a "Reviewed by expert" checkbox. Tested on this PC. Waiting on: the camera
   owners' OK (the live player only embeds on their sites), the one-time Google Sheet setup, and a hosting
-  choice.
+  choice. Parked until embedding is allowed; reaching out to the lab (CoOL) planned.
 
 ## Needs a person
 
