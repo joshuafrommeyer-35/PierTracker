@@ -18,6 +18,13 @@ These are built and switch themselves on; they only need time or answers.
   conditions beat matching species names alone? Needs no camera data. Result decides whether it's
   switched on.
 
+## Built, not live
+
+- **Community IDs** ([COMMUNITY.md](COMMUNITY.md)): viewers click a tracker box and say what it is; answers
+  go to a Google Sheet with a "Reviewed by expert" checkbox. Tested on this PC. Waiting on: the camera
+  owners' OK (the live player only embeds on their sites), the one-time Google Sheet setup, and a hosting
+  choice.
+
 ## Needs a person
 
 - **Review queue**: especially the "ocean whitefish" cards (likely juvenile blacksmith) and the cards of

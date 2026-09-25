@@ -16,3 +16,6 @@ tracker/models/
 __pycache__/
 tracker.stop
 *.partial
+community/secrets.json
+community/submissions/
+community/apps_script.local.gs

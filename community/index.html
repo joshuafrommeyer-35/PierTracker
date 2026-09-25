@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Under Scripps Pier: what's that?</title>
+<style>
+  :root {
+    --bg: #f4f7f8; --fg: #14232b; --muted: #58707c; --card: #ffffff; --line: #d5e0e5;
+    --logged: #ff8a1f; --unsure: #ffd23f; --accent: #0a6e8f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d171c; --fg: #e3edf1; --muted: #93a8b2; --card: #15232a; --line: #24363f; --accent: #3fb3d6; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.5rem; margin: 8px 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 12px; }
+  .player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+  .player iframe, .player img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .player img { object-fit: contain; background: #000; }
+  .golive { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 10px; background: #0b1c24; color: #e3edf1; text-align: center; padding: 24px; }
+  .golive .small { color: #9fb6c0; }
+  a.primary { background: var(--accent); color: #fff; border-radius: 8px; padding: 10px 18px; text-decoration: none; font-weight: 600; }
+  .note { position: absolute; left: 12px; bottom: 10px; color: #fff; font-size: 13px; text-shadow: 0 1px 2px #000; }
+  .overlay { position: absolute; inset: 0; pointer-events: none; }
+  .box { position: absolute; pointer-events: auto; cursor: pointer; border: 3px solid var(--logged); border-radius: 4px;
+         background: transparent; padding: 0; transition: opacity .4s; }
+  .box.unsure { border-color: var(--unsure); border-style: dashed; }
+  .box span { position: absolute; left: -3px; bottom: 100%; white-space: nowrap; font-size: 12px; font-weight: 600;
+              background: var(--logged); color: #1b1100; padding: 1px 6px; border-radius: 4px 4px 4px 0; }
+  .box.unsure span { background: var(--unsure); }
+  .box:hover, .box:focus-visible { outline: 3px solid #fff; outline-offset: 1px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin: 12px 0; color: var(--muted); font-size: .95rem; }
+  .controls label { display: flex; gap: 8px; align-items: center; }
+  .status { margin-left: auto; }
+  .legend i { display: inline-block; width: 14px; height: 10px; border: 2px solid var(--logged); margin-right: 4px; vertical-align: middle; }
+  .legend i.u { border-color: var(--unsure); border-style: dashed; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--fg); width: min(440px, 92vw); padding: 20px; }
+  dialog::backdrop { background: rgba(0, 0, 0, .5); }
+  dialog h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  dialog label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: .95rem; }
+  dialog input, dialog textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+                                  background: var(--bg); color: var(--fg); font: inherit; }
+  .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 16px; font: inherit; cursor: pointer; }
+  button.plain { background: none; border: 1px solid var(--line); color: var(--fg); border-radius: 8px; padding: 8px 16px; font: inherit; cursor: pointer; }
+  .small { color: var(--muted); font-size: .85rem; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line);
+           padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Under Scripps Pier: what's that?</h1>
+  <p class="lead">The live underwater camera at Scripps Pier, La Jolla. An AI (PierTracker) watches the same camera and
+    boxes what it thinks are animals. <strong>Click a box</strong> and say what you see; an expert reviews every answer.</p>
+
+  <div class="player" id="player">
+    {{LIVE}}
+    <img id="still" alt="The tracker's latest look at the camera">
+    <span class="note" id="note"></span>
+    <div class="overlay" id="overlay" aria-live="polite"></div>
+  </div>
+
+  <div class="controls">
+    <span class="legend"><i></i>logged &nbsp; <i class="u"></i>not sure</span>
+    <label><input type="radio" name="view" value="tracker" checked> Tracker view</label>
+    <label><input type="radio" name="view" value="live"> Live video</label>
+    <label id="delayBox" hidden>Line up the boxes with your video:
+      <input type="range" id="delay" min="0" max="30" step="1" value="6"> <output id="delayOut">6 s</output></label>
+    <label><input type="checkbox" id="show" checked> show boxes</label>
+    <span class="status" id="status">connecting…</span>
+  </div>
+  <p class="small">Boxes come from the tracker's own copy of the stream, which can run a few seconds ahead of or
+    behind yours: use the slider until they sit on the animals. Camera: Scripps Institution of Oceanography /
+    HDOnTap. Your answer, the optional name you give, and the tracker's picture of that moment are saved for review.</p>
+</main>
+
+<dialog id="dialog">
+  <form id="form" method="dialog">
+    <h2>What do you think this is?</h2>
+    <div class="small" id="trackerSaid"></div>
+    <label for="cid">Your ID</label>
+    <input id="cid" list="names" maxlength="80" required autocomplete="off" placeholder="e.g. kelp bass, or &quot;not an animal&quot;">
+    <datalist id="names"></datalist>
+    <label for="handle">Your name or handle <span class="small">(optional)</span></label>
+    <input id="handle" maxlength="40" autocomplete="nickname">
+    <label for="note">Anything else? <span class="small">(optional)</span></label>
+    <textarea id="note" rows="2" maxlength="200"></textarea>
+    <div class="row">
+      <button type="button" class="plain" id="cancel">Cancel</button>
+      <button type="submit" class="primary" value="send">Send</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script>
+(() => {
+  const overlay = document.getElementById("overlay");
+  const statusEl = document.getElementById("status");
+  const delayEl = document.getElementById("delay");
+  const delayOut = document.getElementById("delayOut");
+  const showEl = document.getElementById("show");
+  const dialog = document.getElementById("dialog");
+  const form = document.getElementById("form");
+  const toast = document.getElementById("toast");
+  const queue = [];          // detections as received: {at: ms, data}
+  const live = document.getElementById("live"), still = document.getElementById("still");
+  const note = document.getElementById("note"), delayBox = document.getElementById("delayBox");
+  let shown = null, chosen = null, view = "tracker", held = false;  // held: pointer on a box, or the form open
+
+  // Tracker view: the tracker's own latest frame, boxes exactly in place (updates every few seconds).
+  // Live video: the official player, with the boxes shown after an adjustable delay. The player only
+  // loads on sites Scripps/HDOnTap allow (see docs/COMMUNITY.md).
+  for (const r of document.querySelectorAll('input[name="view"]')) {
+    r.addEventListener("change", () => { if (r.checked) setView(r.value); });
+  }
+  function setView(v) {
+    view = v;
+    live.hidden = v !== "live";
+    still.hidden = v !== "tracker";
+    delayBox.hidden = v !== "live" || live.tagName !== "IFRAME";
+    note.textContent = "";
+    delete note.dataset.taken;
+    shown = null;
+    draw();
+  }
+
+  const storage = {          // remembered per viewer; the page works without it
+    get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { } },
+  };
+  delayEl.value = storage.get("delay", "6");
+  document.getElementById("handle").value = storage.get("handle", "");
+  delayOut.textContent = delayEl.value + " s";
+  delayEl.addEventListener("input", () => { delayOut.textContent = delayEl.value + " s"; storage.set("delay", delayEl.value); draw(); });
+  showEl.addEventListener("change", draw);
+
+  fetch("/species").then(r => r.json()).then(names => {
+    const list = document.getElementById("names");
+    for (const n of names) { const o = document.createElement("option"); o.value = n; list.appendChild(o); }
+  }).catch(() => {});
+
+  async function poll() {
+    try {
+      const r = await fetch("/detections", { cache: "no-store" });
+      const data = await r.json();
+      if (!queue.length || queue[queue.length - 1].data.taken_at !== data.taken_at) queue.push({ at: Date.now(), data });
+      while (queue.length > 40) queue.shift();
+      statusEl.textContent = data.status === "ok" || data.status === "poor visibility"
+        ? `tracker: ${data.detections.length} in view (${data.taken_at ? data.taken_at.slice(11) : ""})`
+        : `tracker: ${data.status}`;
+    } catch { statusEl.textContent = "tracker offline"; }
+    draw();
+  }
+
+  function draw() {
+    if (held || dialog.open) return;  // don't swap the picture while someone is aiming at a box
+    const delay = view === "live" ? Number(delayEl.value) * 1000 : 0, now = Date.now();
+    let pick = null;
+    for (const q of queue) if (q.at + delay <= now) pick = q;       // newest one old enough for this viewer's video
+    if (pick && now - (pick.at + delay) > 12000 && view === "live") pick = null;  // nothing recent: clear the boxes
+    if (pick === shown) return;
+    shown = pick;
+    overlay.replaceChildren();
+    if (view === "tracker") {
+      if (pick && pick.data.frame) {
+        if (still.getAttribute("src") !== pick.data.frame) still.src = pick.data.frame;
+        note.dataset.taken = pick.data.taken_at;
+        note.dataset.at = pick.at;
+      } else {
+        still.removeAttribute("src");
+        note.textContent = pick ? "the tracker's frames aren't shared here: use Live video" : "waiting for the tracker…";
+      }
+    } else {
+      note.textContent = "";
+    }
+    if (!pick || !showEl.checked) return;
+    if (view === "live" && live.tagName !== "IFRAME") return;  // no video to draw on (see the link panel)
+    const d = pick.data;
+    for (const det of d.detections) {
+      const [x0, y0, x1, y1] = det.box;
+      const b = document.createElement("button");
+      b.className = "box" + (det.status === "logged" ? "" : " unsure");
+      Object.assign(b.style, { left: 100 * x0 / d.width + "%", top: 100 * y0 / d.height + "%",
+                               width: 100 * (x1 - x0) / d.width + "%", height: 100 * (y1 - y0) / d.height + "%" });
+      const tag = document.createElement("span");
+      tag.textContent = det.status === "logged" ? det.name : det.name + "?";
+      b.appendChild(tag);
+      b.setAttribute("aria-label", `Say what this is (the tracker ${det.status === "logged" ? "logged" : "is not sure it's"} ${det.name})`);
+      b.addEventListener("click", () => open(d.taken_at, det));
+      b.addEventListener("pointerenter", () => { held = true; });
+      b.addEventListener("pointerleave", () => { held = false; });
+      overlay.appendChild(b);
+    }
+  }
+
+  function open(takenAt, det) {
+    chosen = { takenAt, det };
+    document.getElementById("trackerSaid").textContent = det.status === "logged"
+      ? `The tracker logged this as a ${det.name} (${Math.round(det.prob * 100)}%).`
+      : `The tracker isn't sure; its best guess is ${det.name}.`;
+    document.getElementById("cid").value = "";
+    document.getElementById("note").value = "";
+    dialog.showModal();
+  }
+  document.getElementById("cancel").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => { held = false; draw(); });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!chosen) return;
+    const handle = document.getElementById("handle").value.trim();
+    storage.set("handle", handle);
+    const body = { taken_at: chosen.takenAt, box: chosen.det.box, community_id: document.getElementById("cid").value.trim(),
+                   handle, note: document.getElementById("note").value.trim() };
+    dialog.close();
+    try {
+      const r = await fetch("/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      say((await r.json()).message || "sent");
+    } catch { say("couldn't send; please try again"); }
+  });
+
+  function say(text) {
+    toast.textContent = text;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3500);
+  }
+
+  // Tracker view is a slideshow of the tracker's snapshots, not video: say so, with a countdown.
+  setInterval(() => {
+    if (view !== "tracker" || !note.dataset.taken) return;
+    const gaps = [];
+    for (let i = 1; i < queue.length; i++) gaps.push(queue[i].at - queue[i - 1].at);
+    const every = gaps.length ? Math.max(3, Math.round(gaps.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, gaps.length) / 1000)) : 10;
+    const left = Math.max(0, every - Math.round((Date.now() - Number(note.dataset.at)) / 1000));
+    note.textContent = `snapshot ${note.dataset.taken.slice(11)} · a new one about every ${every} s` +
+      (left > 0 ? ` (next in ~${left} s)` : " (any moment)");
+  }, 1000);
+  setView("tracker");
+  poll();
+  setInterval(poll, 2000);
+  setInterval(draw, 500);
+})();
+</script>
+</body>
+</html>

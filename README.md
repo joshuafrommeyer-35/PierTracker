@@ -800,6 +800,8 @@ results/              published summaries: daily, hourly sightings, hourly condi
                       validation, confirmed by hand
 livecams.json         configuration
 setup.ps1             set up and start (run by "Set up and start LiveCams.bat")
+community/            community IDs: viewers click a box and say what it is (built, not public yet:
+                      docs/COMMUNITY.md)
 ```
 
 ## Credits

@@ -38,6 +38,14 @@
     "backupDir": "G:/My Drive/PierTracker backup"  // nightly copy of what can't be recreated (Google Drive)
   },
 
+  // Community viewer (community/server.py; built, not public yet: see docs/COMMUNITY.md). "127.0.0.1" = this PC
+  // only. The Google Sheet's address and password live in community/secrets.json, never in this public file.
+  "community": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "maxPerHourPerViewer": 30
+  },
+
   // Troubleshooting only: opens Chrome DevTools for the cam pages on this localhost port.
   "debugPort": 0
 }

@@ -47,6 +47,9 @@ BURST_FLAG = FRAME.parent / "burst_until"  # LiveCams captures faster until this
 # The last few minutes of daylight frames, so "did it see that?" can be answered afterwards: with a
 # .json next to a frame listing what was ignored there as fixed structure.
 RECENT = FRAME.parent / "recent"
+# What the tracker sees in the latest frame (boxes, names, logged or not sure), for the community
+# viewer (community/server.py). Rewritten every frame.
+LIVE = FRAME.parent / "live.json"
 KEEP_RECENT = timedelta(minutes=10)
 MODELS = ROOT / "models"
 DATA = LIVECAMS / "data"
@@ -661,6 +664,8 @@ class Tracker:
         self.hour["analyzed"] += 1
         stamp = when.isoformat(timespec="seconds")
         if is_dark(img):
+            self.live = []
+            self._write_live(img, when, "dark")
             self.recent_visibility.clear()  # a new day starts fresh
             self.hour["dark"] += 1
             self._save_hour()
@@ -691,8 +696,9 @@ class Tracker:
             return []  # still learning what the empty scene looks like
         if not poor:
             self.background.add(img, when)
-        self.record = None
+        self.record, self.live = None, []
         sightings = self._identify(img, when, poor)
+        self._write_live(img, when, "poor visibility" if poor else "ok")
         if self.record and (self.record["ignored"] or self.record["named"]):
             (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(self.record), encoding="utf-8")
         for s in sightings:
@@ -734,6 +740,11 @@ class Tracker:
         fixtures = [b for b in fish_boxes if corr.get(id(b), -1) >= FIXTURE_SURE_CORR and self.gallery().known_place(img, b)]
         fish_boxes = [b for b in fish_boxes if b not in fixtures]
         self.record = record = {"ignored": [], "named": []}  # for frames/underwater/recent, with the scores
+        self.live = live = []  # for the community viewer: what's in this frame
+
+        def seen_here(box, name, prob, status):
+            live.append({"box": [round(float(v)) for v in box[:4]], "name": name, "prob": round(float(prob), 3),
+                         "status": status})
 
         # 1. Everything that isn't a fish the detector found (octopus, crabs, lobsters, jellies, sea
         #    lions, rays, divers...): look at what moved. Each moving area bigger than a small fish,
@@ -761,6 +772,8 @@ class Tracker:
             if verdict == "suspect":
                 if not m.labels[int(probs.argmax())]["negative"]:
                     queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                    if box != full:
+                        seen_here(box, m.labels[int(probs.argmax())]["common"], probs.max(), "unsure")
                 continue
             label, prob = m.name(probs, None, scene_cut)
             if label is None:
@@ -768,6 +781,8 @@ class Tracker:
                 top = m.labels[best]
                 if top["scene"] and not top["negative"] and probs[best] >= REVIEW_SCENE_PROB:
                     queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                    if box != full:
+                        seen_here(box, top["common"], probs[best], "unsure")
                 continue
             if not label["scene"]:
                 continue  # a fish: the detector's job
@@ -777,6 +792,7 @@ class Tracker:
                 if not first or when - first > SCENE_REPEAT:
                     self.scene_first_seen[name] = when  # wait for it to show up again
                     queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                    seen_here(box, name, prob, "unsure")
                     continue
             visit = self.scene_visits.setdefault(name, [when, when, 0, 0.0])
             visit[1], visit[2], visit[3] = when, visit[2] + 1, max(visit[3], prob)
@@ -786,6 +802,8 @@ class Tracker:
                     queue(view, img, box, top_guesses(m.labels, probs), when, logged_as=name,
                                        embedding=emb)
                 add(label, prob)
+            if box != full:
+                seen_here(box, name, prob, "logged")
             if box == full:
                 whole_frame_animal = label
 
@@ -813,6 +831,7 @@ class Tracker:
                 guesses = top_guesses(m.labels, probs, m.fish_idx)
                 if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
                     queue(crop, img, box[:4], guesses, when, embedding=emb)
+                    seen_here(box, guesses[0]["common"], guesses[0]["prob"], "unsure")
                 continue
             camera = m.camera_name(emb)
             if camera and camera[0] == "not an animal":
@@ -835,6 +854,7 @@ class Tracker:
                 queue(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb)
             add(label, prob, method=method)
             self._save_crop(crop, when, label["common"], prob)
+            seen_here(box, label["common"], prob, "unsure" if label is UNIDENTIFIED else "logged")
 
         # 3. Small fish aren't tracked one by one: a school is one sighting a snapshot, with a rough
         #    size. The detector only boxes a few of them, so the size comes from counting the small
@@ -984,6 +1004,17 @@ class Tracker:
         if verdict == "structure":
             self.fixtures_ignored += 1
         return verdict
+
+    def _write_live(self, img, when: datetime, status: str):
+        """frames/underwater/live.json: this frame's detections, for the community viewer."""
+        try:
+            tmp = LIVE.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"taken_at": when.isoformat(timespec="seconds"), "status": status,
+                                       "width": img.width, "height": img.height,
+                                       "detections": getattr(self, "live", [])}), encoding="utf-8")
+            os.replace(tmp, LIVE)
+        except OSError:
+            pass  # a viewer feature: never stops tracking
 
     @staticmethod
     def _keep_recent(img: Image.Image, when: datetime):
