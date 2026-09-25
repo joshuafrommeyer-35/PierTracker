@@ -294,6 +294,22 @@ def render_conditions(rows):
     return lines
 
 
+def tracker_status():
+    """When the tracker last looked at a frame, so a stalled stream or tracker is visible publicly."""
+    try:
+        import db
+        with db.connect() as con:
+            last = con.execute("SELECT MAX(taken_at) FROM snapshots").fetchone()[0]
+    except Exception:
+        return ""
+    if not last:
+        return ""
+    age = datetime.now() - datetime.fromisoformat(last)
+    if age > timedelta(hours=2):
+        return f" ⚠️ **The tracker hasn't analyzed a frame since {last.replace('T', ' ')}.**"
+    return f" Last frame analyzed {last.replace('T', ' ')}."
+
+
 def render_confirmed(confirmed, rejected):
     if not confirmed and not rejected:
         return []
@@ -327,7 +343,7 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions):
             t["last"] = d
 
     lines = [
-        f"_Last updated {datetime.now():%Y-%m-%d %H:%M} (Pacific). Tracking since {first}._",
+        f"_Last updated {datetime.now():%Y-%m-%d %H:%M} (Pacific). Tracking since {first}._" + tracker_status(),
         "",
         "| | |",
         "|---|---|",

@@ -93,4 +93,7 @@ internal sealed class TrackerConfig
 
     /// <summary>Once a day, push summary stats to the project's GitHub README (tracker/publish_results.py).</summary>
     public bool PublishResults { get; set; }
+
+    /// <summary>Once a day, copy the database, review answers, CSVs and frame bank here (e.g. Google Drive).</summary>
+    public string? BackupDir { get; set; }
 }

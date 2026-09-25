@@ -95,7 +95,7 @@ flowchart LR
      precision. Fewer than five are logged as **small fish**.
    - **80 px and up** is cropped and embedded by [BioCLIP 2.5](https://huggingface.co/imageomics/bioclip-2.5-vith14),
      a vision model trained on the Tree of Life that can match an image against species names it has never
-     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 57 animals in
+     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 70 animals in
      [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
      piling...). So a blurry fish can't come out as an octopus.
    - **Look-alike groups.** Many mistakes are between look-alikes: topsmelt vs. jacksmelt vs. anchovy vs.
@@ -108,7 +108,8 @@ flowchart LR
      was a moment ago are treated as the same fish, and it's named from the **average of all its
      looks**, which is steadier than any single frame. In a test that was ~5 points more accurate (see
      Validation). Each fish becomes one row in the database's `visits` table (arrival, departure, looks,
-     name), so individual visits can be counted, not just snapshots. The extra burst frames feed only
+     name), so individual visits can be counted, not just snapshots. Other animals (a lobster on the
+     piling, a turtle, a seal) are one visit as long as they keep showing up within 5 minutes. The extra burst frames feed only
      the naming and the visits, never the snapshot statistics, because bursts happen exactly when fish
      are around and would inflate them.
    - Once the **camera-trained classifier** has learned from enough review answers (see
@@ -116,7 +117,7 @@ flowchart LR
      knows.
 6. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
    sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
-   lot of it moved, are compared against every label (57 animals + 9 "not an animal"). A "scene" animal
+   lot of it moved, are compared against every label (70 animals + 9 "not an animal"). A "scene" animal
    (marked in `species.json`) counts when it wins with at least 0.70 probability. In a small moving area
    it needs 0.90, or it has to show up again within 30 s: a real lobster stays put, but a flicker of fish
    at a piling edge doesn't.
@@ -309,7 +310,8 @@ score can be checked against the pier's turbidity sensor (a good SQL exercise).
 common fish missing from the list. The model can only answer with names it's given, so a zebra-perch
 swimming by was *forced* into a wrong name. 13 were added (zebra-perch sea chub, giant kelpfish, ocean
 whitefish, rockfishes, croakers, sanddab, lizardfish, greenling, cabezon, grunion, diamond stingray,
-banded guitarfish), for 57 animals. On known-species photos of all 38 species tested:
+banded guitarfish), for 57 animals (three later removed, see below). On known-species photos of all 38
+species tested:
 
 | Species list | Photos of the original 25 | Photos of the 13 added | All 38 |
 |---|---:|---:|---:|
@@ -317,10 +319,50 @@ banded guitarfish), for 57 animals. On known-species photos of all 38 species te
 | 57 animals | 70% | 82% | **74%** |
 
 The cost is that new labels sometimes "steal" answers: ocean whitefish took 3 and zebra-perch 4 of 456.
-On the live cam, the olive, yellow-tailed schooling fish near the pilings went from mostly
-"blacksmith" to mostly "ocean whitefish". Both are plausible (juvenile blacksmith are blue in front and
-orange-yellow behind; ocean whitefish are blue-grey with yellowish fins), and it can't be settled from
-footage this small. That makes it the most useful question for the review queue.
+
+**Then the deep-water species were taken out again.** On the live cam, the small, yellow-tailed fish
+schooling near the pilings went from mostly "blacksmith" to mostly "ocean whitefish". The field guides
+settle it:
+- Juvenile blacksmith are blue-grey in front and bright yellow-orange behind until ~5 cm
+  ([Aquarium of the Pacific](https://www.aquariumofpacific.org/onlinelearningcenter/species/blacksmith)),
+  and school in midwater around structure.
+- Ocean whitefish live 10–91 m down, mostly 24–55 m, near the bottom
+  ([CDFW](https://marinespecies.wildlife.ca.gov/ocean-whitefish/the-species/)). They are unlikely at 4 m.
+
+The iNaturalist records that suggested ocean whitefish and rockfish come from dives in the nearby La
+Jolla Canyon. A direct test confirmed it: 10 photos of *juvenile* blacksmith, degraded to camera
+quality, came out "ocean whitefish" 11 times out of 30 (confidently) and "blacksmith" only 6. Without
+the three deep-water species (ocean whitefish, vermilion and brown rockfish), no confident wrong names
+were left: 7 blacksmith, 6 leaning blacksmith but below the cutoff, the rest unsure. That left 54
+animals, all plausible at ~4 m.
+
+**Then what's actually been seen on this camera.** The cam's [highlight
+clips](https://hdontap.com/stream/018408/scripps-pier-underwater-live-webcam/clips/highlight/), the
+Scripps/CoOL pages, news stories and viewer forums list:
+- a **sea turtle** (clip from 2026-09-22; La Jolla Shores has resident green turtles)
+- octopus, seals, a stingray, leopard sharks, cormorants diving, lobsters, giant sea bass
+- a baby garibaldi, mysid shrimp swarms, and swimmers
+
+Fishing and diving reports add seasonal and El Niño visitors: mackerel, bonito, barracuda and yellowtail
+(all reported at La Jolla in 2026), croakers, pelagic red crabs (they swarmed La Jolla Shores in the
+2015 El Niño), pufferfish and triggerfish.
+
+17 candidates were tested the same way, on photos of every current and candidate species:
+
+| Species list | Photos of current species | Photos of candidates | Juvenile blacksmith | All |
+|---|---:|---:|---:|---:|
+| 54 animals | 77% of names right | 8% | 6/20 | 57% |
+| + candidates | 78% | 72% | 6/20 | **76%** |
+
+- **15 were added:** green sea turtle (right 10 of 12), market squid (9/12), queenfish (8/12),
+  finescale triggerfish (7/12), chub and jack mackerel, bonito, barracuda, yellowtail, white seaperch,
+  barred surfperch, white and yellowfin croaker, pelagic red crab and bullseye pufferfish. Most took 0–1
+  answers from other species.
+- **2 were left out:** thornback ray (never right, took 2 answers) and olive ridley turtle (always
+  called green sea turtle, so it added nothing).
+- **Also added:** "swimmer or snorkeler", next to scuba diver.
+
+The list is now **70 animals**.
 
 **Also looked at:**
 - NOAA's [AI for protected species](https://www.fisheries.noaa.gov/new-england-mid-atlantic/science-data/using-artificial-intelligence-study-protected-species)
@@ -536,6 +578,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `watchedIdleSeconds` / `coverThreshold` | What counts as "someone is looking" |
 | `pauseDuringFullscreenApps` | Unload the cams during games and other full-screen apps |
 | `tracker.enabled` / `publishResults` | Run the tracker; push daily results to GitHub |
+| `tracker.backupDir` | Folder for the nightly backup (e.g. on Google Drive); leave out for none |
 | `debugPort` | Troubleshooting only (Chrome DevTools on localhost). Keep at 0 |
 
 ### Files it writes (local only, not committed)
@@ -545,6 +588,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `data/sightings.csv` | Every sighting: one row per animal type per snapshot |
 | `data/hourly_summary.csv` | Per hour: snapshots analyzed, dark snapshots, and per animal the snapshots seen and max count |
 | `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
+| Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`) |
 | `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
 | `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
 | `data/piertracker.db` | The SQLite database: snapshots, sightings, species, conditions, reviews |

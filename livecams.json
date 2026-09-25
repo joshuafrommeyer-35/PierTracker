@@ -34,7 +34,8 @@
     "enabled": true,
     "python": "tracker/.venv/Scripts/pythonw.exe",
     "script": "tracker/tracker.py",
-    "publishResults": true            // once a day, push summary stats to the GitHub README
+    "publishResults": true,           // once a day, push summary stats to the GitHub README
+    "backupDir": "G:/My Drive/PierTracker backup"  // nightly copy of what can't be recreated (Google Drive)
   },
 
   // Troubleshooting only: opens Chrome DevTools for the cam pages on this localhost port.

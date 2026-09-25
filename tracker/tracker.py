@@ -60,6 +60,7 @@ REGULAR_SECONDS = 9          # frames closer together than this are burst frames
 # (README). When a fish big enough to name is in view, LiveCams is asked for a frame every ~3 s.
 TRACK_GAP = timedelta(seconds=12)   # a fish unseen this long has left: its visit is recorded
 TRACK_MIN_DISTANCE = 150            # px: how far a fish may move between frames and still be the same one
+SCENE_VISIT_GAP = timedelta(minutes=5)  # a lobster, turtle or seal seen again within this is the same visit
 BURST_SECONDS = 20
 BURST_BUDGET = timedelta(minutes=10)  # at most this much burst time per hour
 STALE_SECONDS = 60          # a frame older than this means the wallpaper isn't streaming
@@ -440,8 +441,9 @@ class Track:
 
 
 class Tracker:
-    def __init__(self, publish=False):
+    def __init__(self, publish=False, backup=None):
         self.publish = publish
+        self.backup = backup
         self._models = None
         self.last_model_use = datetime.now()
         DATA.mkdir(parents=True, exist_ok=True)
@@ -457,6 +459,7 @@ class Tracker:
         self.scene_first_seen = {}
         self.last_bank = datetime.min
         self.tracks = []
+        self.scene_visits = {}  # name -> [first seen, last seen, looks, best confidence]
         self.last_regular = None
         self.bursts = deque()  # start times of recent bursts, for the hourly budget
 
@@ -566,6 +569,8 @@ class Tracker:
                     self.scene_first_seen[name] = when  # wait for it to show up again
                     queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
                     continue
+            visit = self.scene_visits.setdefault(name, [when, when, 0, 0.0])
+            visit[1], visit[2], visit[3] = when, visit[2] + 1, max(visit[3], prob)
             if name not in found:
                 self._save_crop(view, when, name, prob)
                 if not label.get("group"):
@@ -668,7 +673,13 @@ class Tracker:
                 self._follow(box, probs, when)
 
     def _end_visits(self, when: datetime):
-        """Records the fish that have left: one row per visit, named from all its looks."""
+        """Records the animals that have left: one row per visit. Fish are followed by position and named
+        from all their looks; other animals (a lobster on a piling, a turtle, a seal) by name."""
+        for name, (first, last, looks, conf) in list(self.scene_visits.items()):
+            if when - last > SCENE_VISIT_GAP:
+                db.record_visit(self.db, first.isoformat(timespec="seconds"), last.isoformat(timespec="seconds"),
+                                looks, name, conf)
+                del self.scene_visits[name]
         done = [t for t in self.tracks if when - t.last_seen > TRACK_GAP]
         self.tracks = [t for t in self.tracks if t not in done]
         if not done or self._models is None:
@@ -774,7 +785,7 @@ class Tracker:
         if h["date"] != when.date().isoformat():
             # New day: the nightly job (conditions, retraining from review answers, the conditions
             # model, and the public README if enabled). Idle priority, no waiting.
-            args = [sys.executable, str(ROOT / "nightly.py")] + (["--publish"] if self.publish else [])
+            args = [sys.executable, str(ROOT / "nightly.py")] + (["--publish"] if self.publish else []) +                 (["--backup", self.backup] if self.backup else [])
             subprocess.Popen(args, cwd=ROOT, creationflags=0x08000000 | 0x40)  # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS
             log.info("new day: nightly job started")
         self.hour = self._new_hour(when)
@@ -845,7 +856,8 @@ def main():
                                                    backupCount=1, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, handlers=[handler], format="%(asctime)s %(message)s",
                         datefmt="%Y-%m-%d %H:%M:%S")
-    tracker = Tracker(publish="--publish" in sys.argv)
+    backup = sys.argv[sys.argv.index("--backup") + 1] if "--backup" in sys.argv else None
+    tracker = Tracker(publish="--publish" in sys.argv, backup=backup)
     last_mtime = None
     while True:
         try:

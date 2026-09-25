@@ -59,6 +59,7 @@ internal sealed class TrackerProcess
     private readonly string script;
     private readonly string workDir;
     private readonly bool publish;
+    private readonly string? backupDir;
     private Process? process;
     private DateTime lastStart = DateTime.MinValue;
 
@@ -68,6 +69,7 @@ internal sealed class TrackerProcess
         script = Path.GetFullPath(Path.Combine(configDir, config.Script));
         workDir = Path.GetDirectoryName(script)!;
         publish = config.PublishResults;
+        backupDir = config.BackupDir;
     }
 
     public int? ProcessId => process is { HasExited: false } p ? p.Id : null;
@@ -82,7 +84,8 @@ internal sealed class TrackerProcess
         lastStart = DateTime.UtcNow;
         try
         {
-            string args = $"\"{script}\"" + (publish ? " --publish" : "");
+            string args = $"\"{script}\"" + (publish ? " --publish" : "") +
+                          (string.IsNullOrWhiteSpace(backupDir) ? "" : $" --backup \"{backupDir}\"");
             process = Process.Start(new ProcessStartInfo(python, args)
             {
                 WorkingDirectory = workDir,

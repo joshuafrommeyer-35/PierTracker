@@ -5,20 +5,48 @@
   2. Retrain the camera classifier from the review window's answers (ml/train_classifier.py).
   3. Refit "what brings animals in" (ml/conditions_model.py), once there's enough data.
   4. With --publish: update the README's results and push them (publish_results.py).
+  5. With --backup <folder> (e.g. on Google Drive): copy what can't be recreated there: the database,
+     the review answers, the raw CSVs, and the frame bank (kept there for good; the PC keeps 90 days).
 
 Each step runs even if an earlier one fails, and failures go to logs/nightly.log.
 """
 
 import logging
 import logging.handlers
+import shutil
+import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 LIVECAMS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-def main(publish: bool):
+def backup(target: Path):
+    import db
+    target.mkdir(parents=True, exist_ok=True)
+    data = LIVECAMS / "data"
+    # The database via SQLite's backup (consistent while the tracker writes), made locally first:
+    # synced folders don't like SQLite writing to them directly.
+    with tempfile.TemporaryDirectory() as tmp:
+        copy_path = Path(tmp) / "piertracker.db"
+        with db.connect() as live, sqlite3.connect(copy_path) as copy:
+            live.backup(copy)
+        shutil.copy2(copy_path, target / "piertracker.db")
+    for csv_file in data.glob("*.csv"):
+        shutil.copy2(csv_file, target / csv_file.name)
+    if (data / "review").exists():
+        shutil.copytree(data / "review", target / "review", dirs_exist_ok=True)
+    # The frame bank only grows there: copy what's new, never delete.
+    for frame in (data / "frame_bank").rglob("*.jpg"):
+        dest = target / "frame_bank" / frame.relative_to(data / "frame_bank")
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(frame, dest)
+
+
+def main(publish: bool, backup_dir: str = None):
     handler = logging.handlers.RotatingFileHandler(LIVECAMS / "logs" / "nightly.log", maxBytes=500_000,
                                                    backupCount=1, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, handlers=[handler], format="%(asctime)s %(name)s %(message)s")
@@ -45,7 +73,10 @@ def main(publish: bool):
     if publish:
         import publish_results
         step("publish", lambda: publish_results.main(update_environment=False))
+    if backup_dir:
+        step("backup", lambda: backup(Path(backup_dir)))
 
 
 if __name__ == "__main__":
-    main(publish="--publish" in sys.argv)
+    args = sys.argv[1:]
+    main(publish="--publish" in args, backup_dir=args[args.index("--backup") + 1] if "--backup" in args else None)
