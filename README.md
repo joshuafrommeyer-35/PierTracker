@@ -154,8 +154,13 @@ The sources were checked before use:
 - One of the station's two chlorophyll sensors wasn't reporting, so the working one is used.
 - About 12% of turbidity readings fail quality control, and those are dropped.
 
-Each value is the median of that hour's readings. The hourly sightings (`results/hourly_summary.csv`) and
-hourly conditions join on `date` + `hour`. Recording through a strong El Niño makes this a good season to
+Each value is the median of that hour's readings. Two public files, from the least to the most detail:
+- [`results/daily_conditions.csv`](results/daily_conditions.csv): one row per day, with water temperature
+  (mean, min, max, normal for the date, anomaly), turbidity, chlorophyll, salinity, oxygen, pH, tide
+  range, air temperature, wind, the El Niño index, and that day's clear/murky tracking effort and
+  sightings. The README shows the headline, a temperature chart and a folded table.
+- [`results/environment_hourly.csv`](results/environment_hourly.csv): every hour, to join with the hourly
+  sightings (`results/hourly_summary.csv`) on `date` + `hour`. Recording through a strong El Niño makes this a good season to
 start: warm-water visitors and missing regulars should both show up against the temperature anomaly.
 
 ### What the numbers mean

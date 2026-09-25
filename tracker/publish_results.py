@@ -190,36 +190,107 @@ def load_environment():
         return {(r["date"], int(r["hour"])): r for r in csv.DictReader(f)}
 
 
-def render_conditions(days, env):
-    """Daily conditions at the pier next to the day's sightings, last 7 tracked days."""
-    recent = sorted(days)[-7:]
-    if not env or not recent:
+DAILY_CONDITIONS_FIELDS = [
+    "date", "water_temp_c", "water_temp_normal_c", "water_temp_anomaly_c", "water_temp_min_c", "water_temp_max_c",
+    "turbidity_ntu_daytime", "chlorophyll_ug_l", "salinity_psu", "oxygen_mg_l", "ph", "tide_range_m",
+    "air_temp_c", "wind_speed_ms", "el_nino_index_oni", "clear_snapshots", "murky_snapshots", "animal_snapshots"]
+
+
+def daily_conditions(days, env):
+    """One row per day: the pier's physical and chemical conditions next to that day's tracking effort
+    and sightings. Days run from the first tracked day to the last day with conditions."""
+    if not env or not days:
+        return []
+    try:
+        normal = environment.climatology()
+    except Exception:  # the normal is a bonus; the rest of the row stands without it
+        normal = {}
+    last = max(max(d for d, _ in env), max(days))
+    rows = []
+    day = date.fromisoformat(min(days))
+    while day.isoformat() <= last:
+        d = day.isoformat()
+
+        def pick(column, hours=range(24)):
+            return [float(env[(d, h)][column]) for h in hours if env.get((d, h), {}).get(column) not in (None, "")]
+
+        def agg(vals, how, digits):
+            return round(how(vals), digits) if vals else None
+
+        temps, tide = pick("pier_water_temp_c"), pick("tide_predicted_m")
+        norm = normal.get(day.timetuple().tm_yday)
+        mean_temp = agg(temps, statistics.mean, 2)
+        oni = pick("oni")
+        tracked = days.get(d)
+        rows.append({
+            "date": d, "water_temp_c": mean_temp, "water_temp_normal_c": None if norm is None else round(norm, 2),
+            "water_temp_anomaly_c": None if norm is None or mean_temp is None else round(mean_temp - norm, 2),
+            "water_temp_min_c": agg(temps, min, 2), "water_temp_max_c": agg(temps, max, 2),
+            "turbidity_ntu_daytime": agg(pick("turbidity_ntu", range(7, 19)), statistics.median, 2),
+            "chlorophyll_ug_l": agg(pick("chlorophyll_ug_l"), statistics.mean, 2),
+            "salinity_psu": agg(pick("salinity_psu"), statistics.mean, 2),
+            "oxygen_mg_l": agg(pick("oxygen_mg_l"), statistics.mean, 2),
+            "ph": agg(pick("ph"), statistics.mean, 3),
+            "tide_range_m": round(max(tide) - min(tide), 2) if tide else None,
+            "air_temp_c": agg(pick("air_temp_c"), statistics.mean, 1),
+            "wind_speed_ms": agg(pick("wind_speed_ms"), statistics.mean, 1),
+            "el_nino_index_oni": oni[-1] if oni else None,
+            "clear_snapshots": tracked["analyzed"] - tracked["dark"] - tracked["murky"] if tracked else 0,
+            "murky_snapshots": tracked["murky"] if tracked else 0,
+            "animal_snapshots": sum(seen for seen, _ in tracked["species"].values()) if tracked else 0,
+        })
+        day += timedelta(days=1)
+    return rows
+
+
+def write_daily_conditions(rows):
+    RESULTS.mkdir(exist_ok=True)
+    with (RESULTS / "daily_conditions.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, DAILY_CONDITIONS_FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def render_conditions(rows):
+    """Kept short on purpose: one headline, one chart, and the table folded away."""
+    if not rows:
         return []
 
-    def daily(d, column, how, hours=range(24)):
-        vals = [float(env[(d, h)][column]) for h in hours if env.get((d, h), {}).get(column) not in (None, "")]
-        return how(vals) if vals else None
+    def fmt(v, digits=1, signed=False):
+        return "–" if v is None else (f"{v:+.{digits}f}" if signed else f"{v:.{digits}f}")
 
-    def fmt(v, digits=1):
-        return "" if v is None else f"{v:.{digits}f}"
-
+    latest = next((r for r in reversed(rows) if r["water_temp_c"] is not None), rows[-1])
+    oni = latest["el_nino_index_oni"]
+    enso = ("" if oni is None else f" El Niño index **{oni:+.1f}**" +
+            (" (El Niño)." if oni >= 0.5 else " (La Niña)." if oni <= -0.5 else " (neutral)."))
     lines = ["", "### Conditions at the pier", "",
-             "From sensors on the pier: water temperature, turbidity and chlorophyll from the SCCOOS shore station "
-             "(~5 m deep, next to the camera; only readings that passed quality control), and the tide from NOAA's "
-             "La Jolla gauge. Hourly values for every day are in "
-             "[`results/environment_hourly.csv`](results/environment_hourly.csv), next to the hourly sightings in "
-             "[`results/hourly_summary.csv`](results/hourly_summary.csv).", "",
-             "| Date | Water temp (°C) | Turbidity, daytime (NTU) | Chlorophyll (µg/L) | Tide range (m) | Animal snapshots |",
-             "|---|---:|---:|---:|---:|---:|"]
-    daytime = range(7, 19)
-    for d in recent:
-        lo = daily(d, "tide_predicted_m", min)
-        hi = daily(d, "tide_predicted_m", max)
-        sightings = sum(s for s, _ in days[d]["species"].values())
-        lines.append(f"| {d} | {fmt(daily(d, 'pier_water_temp_c', statistics.mean))} | "
-                     f"{fmt(daily(d, 'turbidity_ntu', statistics.median, daytime), 2)} | "
-                     f"{fmt(daily(d, 'chlorophyll_ug_l', statistics.mean), 2)} | "
-                     f"{fmt(hi - lo if lo is not None and hi is not None else None, 2)} | {sightings:,} |")
+             f"**{latest['date']}:** water {fmt(latest['water_temp_c'])} °C at ~5 m, "
+             f"**{fmt(latest['water_temp_anomaly_c'], signed=True)} °C** vs. normal for the date. Turbidity "
+             f"{fmt(latest['turbidity_ntu_daytime'], 2)} NTU, chlorophyll {fmt(latest['chlorophyll_ug_l'], 2)} µg/L."
+             + enso, ""]
+    chart = [r for r in rows if r["water_temp_c"] is not None][-30:]
+    if len(chart) >= 2 and all(r["water_temp_normal_c"] is not None for r in chart):
+        lo = min(min(r["water_temp_c"], r["water_temp_normal_c"]) for r in chart)
+        hi = max(max(r["water_temp_c"], r["water_temp_normal_c"]) for r in chart)
+        lines += ["```mermaid", "xychart-beta",
+                  '    title "Water temperature at the pier vs. normal for the date (°C)"',
+                  '    x-axis [' + ", ".join(f'"{r["date"][5:]}"' for r in chart) + "]",
+                  f'    y-axis "°C" {int(lo) - 1} --> {int(hi) + 2}',
+                  "    line [" + ", ".join(str(r["water_temp_c"]) for r in chart) + "]",
+                  "    line [" + ", ".join(str(r["water_temp_normal_c"]) for r in chart) + "]",
+                  "```", "",
+                  "_Upper line: this year. Lower line: the 2013–2025 normal for each date._", ""]
+    lines += ["<details><summary>Daily conditions, last 14 days</summary>", "",
+              "| Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for r in rows[-14:]:
+        lines.append(f"| {r['date']} | {fmt(r['water_temp_c'])} | {fmt(r['water_temp_anomaly_c'], signed=True)} | "
+                     f"{fmt(r['turbidity_ntu_daytime'], 2)} | {fmt(r['chlorophyll_ug_l'], 2)} | {fmt(r['salinity_psu'], 2)} | "
+                     f"{fmt(r['oxygen_mg_l'], 2)} | {fmt(r['ph'], 2)} | {fmt(r['tide_range_m'], 2)} | {r['animal_snapshots']:,} |")
+    lines += ["", "Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla "
+              "tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); "
+              "hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).",
+              "", "</details>"]
     return lines
 
 
@@ -236,7 +307,7 @@ def render_confirmed(confirmed, rejected):
     return lines
 
 
-def render(days, by_hour_of_day, validation, confirmed, rejected, env):
+def render(days, by_hour_of_day, validation, confirmed, rejected, conditions):
     if not days:
         return "_No results yet. The tracker publishes here once a day after it starts running._"
     cats = categories()
@@ -314,7 +385,7 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, env):
         "[what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the "
         "[camera-trained classifier](results/camera_classifier.md) (trained from the review answers).",
     ]
-    return "\n".join(lines + render_conditions(days, env) + render_confirmed(confirmed, rejected)
+    return "\n".join(lines + render_conditions(conditions) + render_confirmed(confirmed, rejected)
                      + render_validation(validation))
 
 
@@ -359,7 +430,9 @@ def main(push=True, update_environment=True):
     for name, (checked, wrong) in checks.items():  # review-window checks count as validation too
         validation[name][0] += checked
         validation[name][1] += wrong
-    update_readme(render(days, by_hour, validation, confirmed, rejected, load_environment()))
+    conditions = daily_conditions(days, load_environment())
+    write_daily_conditions(conditions)
+    update_readme(render(days, by_hour, validation, confirmed, rejected, conditions))
     if not push:
         return
     git("add", "README.md", "results")
