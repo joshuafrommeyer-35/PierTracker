@@ -48,8 +48,12 @@ PREDICTORS = {
 def load():
     sightings = pd.read_csv(SIGHTINGS)
     conditions = pd.read_csv(CONDITIONS)
-    effort = (sightings.groupby(["date", "hour"])[["snapshots_analyzed", "snapshots_dark"]].first()
-              .assign(daylight=lambda d: d.snapshots_analyzed - d.snapshots_dark)
+    if "snapshots_murky" not in sightings:
+        sightings["snapshots_murky"] = 0
+    sightings["snapshots_murky"] = sightings["snapshots_murky"].fillna(0)
+    # Effort = clear-water daylight snapshots: dark and murky ones couldn't have seen anything.
+    effort = (sightings.groupby(["date", "hour"])[["snapshots_analyzed", "snapshots_dark", "snapshots_murky"]].first()
+              .assign(daylight=lambda d: d.snapshots_analyzed - d.snapshots_dark - d.snapshots_murky)
               .query("daylight > 0").reset_index())
     seen = sightings.dropna(subset=["common_name"]).pivot_table(
         index=["date", "hour"], columns="common_name", values="snapshots_seen", aggfunc="sum", fill_value=0)

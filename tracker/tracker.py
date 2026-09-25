@@ -38,6 +38,8 @@ import numpy as np
 import openvino as ov
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+import db
+
 ROOT = Path(__file__).resolve().parent
 LIVECAMS = ROOT.parent
 FRAME = LIVECAMS / "frames" / "underwater" / "latest.jpg"
@@ -56,7 +58,18 @@ DARK_MEAN = 20              # mean brightness (0-255) below which a frame is "ni
 DARK_DETAIL = 4.0           # detail left after blurring; night sensor noise averages away to ~0
 DETECT_THRESHOLD = 0.35     # fish detector confidence
 MIN_NAME_PX = 80            # fish smaller than this (longest side, 1080p frame) are too small to tell apart
-SPECIES_MIN_PROB = 0.60     # below this a detected fish is logged as unidentified
+# Cutoffs measured on photos of known species degraded to look like this camera (README,
+# "Validation"): at 0.85 / 0.90 about 80% of the names logged are right; at 0.6 it was ~64%.
+SPECIES_MIN_PROB = 0.85     # a species name needs this probability...
+GROUP_MIN_PROB = 0.90       # ...a look-alike group this much (summed over its members)...
+# ...and in hazy water, where naming accuracy halves long before counting suffers, no species at all:
+SPECIES_MIN_PROB_POOR = float("inf")
+GROUP_MIN_PROB_POOR = 0.95
+# Visibility = fine detail left in the frame (mean |frame - blurred frame| at 240x135). Clear water
+# today reads 2.1-3.1. With simulated murk, naming fell from 92% right to 50% by ~1.1 and detection
+# collapsed below ~0.2 (README, "Validation").
+VISIBILITY_POOR = 1.4
+VISIBILITY_MIN = 0.2
 NEGATIVE_MIN_PROB = 0.50    # a detection this sure to be murk/kelp/piling is dropped
 SCENE_MIN_PROB = 0.70       # a non-fish/big animal must beat every label by this much
 SCENE_SURE_PROB = 0.90      # in a small moving area it must reach this, or show up again soon:
@@ -90,7 +103,8 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], np.float32)
 
 SIGHTING_FIELDS = ["timestamp", "date", "time", "common_name", "scientific_name", "category", "count", "confidence",
                    "method"]
-HOURLY_FIELDS = ["date", "hour", "snapshots_analyzed", "snapshots_dark", "common_name", "snapshots_seen", "max_count"]
+HOURLY_FIELDS = ["date", "hour", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name",
+                 "snapshots_seen", "max_count"]
 UNIDENTIFIED = {"common": "fish (unidentified)", "scientific": "", "category": "fish"}
 SMALL_FISH = {"common": "small fish", "scientific": "", "category": "fish"}
 
@@ -174,7 +188,7 @@ class Models:
         x = ((x - self.cls_mean) / self.cls_std).transpose(2, 0, 1)[None]
         return self.classifier(x)[0][0]
 
-    def name(self, probs: np.ndarray, subset, min_prob: float):
+    def name(self, probs: np.ndarray, subset, min_prob: float, group_min: float = None):
         """(label, probability) for the most likely animal if it reaches min_prob; otherwise for its
         look-alike group when the model spreads its confidence over the group's members (a smelt it
         can't split between topsmelt, jacksmelt, anchovy and sardine is still clearly one of them);
@@ -191,7 +205,7 @@ class Models:
                 totals[group] += float(probs[k])
         if totals:
             group, total = max(totals.items(), key=lambda kv: kv[1])
-            if total >= min_prob:
+            if total >= (min_prob if group_min is None else group_min):
                 return self.groups[group], total
         return None, float(probs[best])
 
@@ -301,6 +315,14 @@ def review_card(view: Image.Image, frame: Image.Image, box, guesses, when: datet
     return card
 
 
+def visibility(img: Image.Image) -> float:
+    """How much fine detail the frame shows: edges of pilings, fish, growth. Murky water washes
+    them out, so this falls as turbidity rises."""
+    g = np.asarray(img.convert("L").resize((240, 135), Image.BOX), np.float32)
+    blurred = np.asarray(Image.fromarray(g.astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)), np.float32)
+    return float(np.mean(np.abs(g - blurred)))
+
+
 def is_dark(img: Image.Image) -> bool:
     """Night: too dark, no detail, or the purple-grey sensor noise this camera shows at night.
     In daylight the water here is green, so the green channel leads."""
@@ -388,37 +410,68 @@ class Tracker:
         self.last_review = {"uncertain": {}, "check": {}}
         self.review_times = {"uncertain": deque(), "check": deque()}
         self.motion = Motion()
+        self.murky = False
+        self.recent_visibility = deque(maxlen=3)
+        self.db = db.connect()
         self.scene_first_seen = {}
 
     def process(self, img: Image.Image, when: datetime):
         self._roll_hour(when)
         self.hour["analyzed"] += 1
+        stamp = when.isoformat(timespec="seconds")
         if is_dark(img):
+            self.recent_visibility.clear()  # a new day starts fresh
             self.hour["dark"] += 1
             self._save_hour()
+            db.record_snapshot(self.db, stamp, True, [])
             return []
+
+        # Water clarity: too murky and nothing is identified (like night); poor and only sure
+        # things are named. Murky frames count as effort lost, not as "no animals".
+        self.recent_visibility.append(visibility(img))
+        clarity = float(np.median(self.recent_visibility))  # last 3 frames, so the state doesn't flicker
+        if clarity < VISIBILITY_MIN:
+            self.hour["murky"] = self.hour.get("murky", 0) + 1
+            self._save_hour()
+            db.record_snapshot(self.db, stamp, False, [], murky=True, visibility=clarity)
+            if not self.murky:
+                log.info("%s: water too murky to identify anything (visibility %.2f)", when.strftime("%H:%M:%S"), clarity)
+            self.murky = True
+            return []
+        if self.murky:
+            log.info("%s: water clear enough again (visibility %.2f)", when.strftime("%H:%M:%S"), clarity)
+        self.murky = False
+        poor = clarity < VISIBILITY_POOR
 
         started = time.perf_counter()
         if not self.motion.update(img, when):
             self._save_hour()
+            db.record_snapshot(self.db, stamp, False, [], visibility=clarity)
             return []  # still learning what the empty scene looks like
-        sightings = self._identify(img, when)
+        sightings = self._identify(img, when, poor)
         for s in sightings:
             seen = self.hour["species"].setdefault(s.common, [0, 0])
             seen[0] += 1
             seen[1] = max(seen[1], s.count)
         self._save_hour()
+        db.record_snapshot(self.db, stamp, False, sightings, visibility=clarity)
         if sightings:
             self._append(SIGHTINGS_CSV, SIGHTING_FIELDS, [
                 [when.isoformat(timespec="seconds"), when.date().isoformat(), when.strftime("%H:%M:%S"),
                  s.common, s.scientific, s.category, s.count, f"{s.confidence:.2f}", s.method] for s in sightings])
-        log.info("%s: %s (%.2fs)", when.strftime("%H:%M:%S"),
+        log.info("%s: %s (%.2fs%s)", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing",
-                 time.perf_counter() - started)
+                 time.perf_counter() - started, ", poor visibility" if poor else "")
         return sightings
 
-    def _identify(self, img: Image.Image, when: datetime):
+    def _identify(self, img: Image.Image, when: datetime, poor=False):
+        """poor: the water is hazy. Only very sure names are logged (else the look-alike group or
+        "unidentified"), and nothing goes to the review queue: a person couldn't judge it either."""
         m = self.models()
+        species_cut = SPECIES_MIN_PROB_POOR if poor else SPECIES_MIN_PROB
+        group_cut = GROUP_MIN_PROB_POOR if poor else GROUP_MIN_PROB
+        scene_cut = SCENE_SURE_PROB if poor else SCENE_MIN_PROB
+        queue = (lambda *a, **k: None) if poor else self._queue_review
         found = defaultdict(lambda: [0, 0.0, None, "zero-shot"])  # name -> [count, best prob, label, method]
 
         def add(label, prob, count=1, method="zero-shot"):
@@ -446,12 +499,12 @@ class Tracker:
             view = img if box == full else square_crop(img, box)
             emb = m.embed(view)
             probs = m.probabilities(emb)
-            label, prob = m.name(probs, None, SCENE_MIN_PROB)
+            label, prob = m.name(probs, None, scene_cut)
             if label is None:
                 best = int(probs.argmax())
                 top = m.labels[best]
                 if top["scene"] and not top["negative"] and probs[best] >= REVIEW_SCENE_PROB:
-                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                    queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
                 continue
             if not label["scene"]:
                 continue  # a fish: the detector's job
@@ -460,12 +513,12 @@ class Tracker:
                 first = self.scene_first_seen.get(name)
                 if not first or when - first > SCENE_REPEAT:
                     self.scene_first_seen[name] = when  # wait for it to show up again
-                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
+                    queue(view, img, box, top_guesses(m.labels, probs), when, embedding=emb)
                     continue
             if name not in found:
                 self._save_crop(view, when, name, prob)
                 if not label.get("group"):
-                    self._queue_review(view, img, box, top_guesses(m.labels, probs), when, logged_as=name,
+                    queue(view, img, box, top_guesses(m.labels, probs), when, logged_as=name,
                                        embedding=emb)
                 add(label, prob)
             if box == full:
@@ -491,17 +544,17 @@ class Tracker:
             camera = m.camera_name(emb)
             if camera and camera[0] == "not an animal":
                 continue  # learned from people's answers: this kind of thing isn't an animal
-            label, prob = camera or m.name(probs, m.fish_idx, SPECIES_MIN_PROB)
+            label, prob = camera or m.name(probs, m.fish_idx, species_cut, group_cut)
             method = "camera-trained" if camera else "zero-shot"
             guesses = top_guesses(m.labels, probs, m.fish_idx)
             if label is None or label.get("group"):
                 # Not sure of the species: a person may be able to tell.
                 if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
-                    self._queue_review(crop, img, box[:4], guesses, when, embedding=emb)
+                    queue(crop, img, box[:4], guesses, when, embedding=emb)
                 if label is None:
                     label, prob, method = UNIDENTIFIED, float(box[4]), "detector only"  # not even the group
             else:
-                self._queue_review(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb)
+                queue(crop, img, box[:4], guesses, when, logged_as=label["common"], embedding=emb)
             add(label, prob, method=method)
             self._save_crop(crop, when, label["common"], prob)
 
@@ -586,16 +639,18 @@ class Tracker:
 
     @staticmethod
     def _new_hour(when: datetime):
-        return {"date": when.date().isoformat(), "hour": when.hour, "analyzed": 0, "dark": 0, "species": {}}
+        return {"date": when.date().isoformat(), "hour": when.hour, "analyzed": 0, "dark": 0, "murky": 0, "species": {}}
 
     def _roll_hour(self, when: datetime):
         h = self.hour
         if (h["date"], h["hour"]) == (when.date().isoformat(), when.hour):
             return
         if h["analyzed"]:
-            rows = [[h["date"], h["hour"], h["analyzed"], h["dark"], name, seen, most]
+            murky = h.get("murky", 0)
+            rows = [[h["date"], h["hour"], h["analyzed"], h["dark"], murky, name, seen, most]
                     for name, (seen, most) in sorted(h["species"].items())]
-            self._append(HOURLY_CSV, HOURLY_FIELDS, rows or [[h["date"], h["hour"], h["analyzed"], h["dark"], "", 0, 0]])
+            self._append(HOURLY_CSV, HOURLY_FIELDS,
+                         rows or [[h["date"], h["hour"], h["analyzed"], h["dark"], murky, "", 0, 0]])
         if h["date"] != when.date().isoformat():
             # New day: the nightly job (conditions, retraining from review answers, the conditions
             # model, and the public README if enabled). Idle priority, no waiting.

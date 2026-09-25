@@ -1,6 +1,7 @@
 """The once-a-day job the tracker starts at the first frame after midnight (idle priority).
 
-  1. Fetch the pier's conditions (environment.py).
+  1. Fetch the pier's conditions (environment.py), and copy them, the species list and the
+     review answers into the SQLite database (db.py).
   2. Retrain the camera classifier from the review window's answers (ml/train_classifier.py).
   3. Refit "what brings animals in" (ml/conditions_model.py), once there's enough data.
   4. With --publish: update the README's results and push them (publish_results.py).
@@ -30,8 +31,14 @@ def main(publish: bool):
         except Exception:
             log.exception("%s failed", name)
 
+    import db
     import environment
     step("conditions", environment.update)
+
+    def sync_database():
+        with db.connect() as con:
+            db.sync(con)
+    step("database", sync_database)
     from ml import conditions_model, train_classifier
     step("camera classifier", train_classifier.main)
     step("conditions model", conditions_model.main)

@@ -41,14 +41,15 @@ NO_WINDOW = 0x08000000
 
 
 def load_hourly():
-    effort = {}                                    # (date, hour) -> (analyzed, dark)
+    effort = {}                                    # (date, hour) -> (analyzed, dark, murky)
     species = defaultdict(lambda: [0, 0])          # (date, hour, name) -> [snapshots seen, max count]
     if not HOURLY_CSV.exists():
         return effort, species
     with HOURLY_CSV.open(encoding="utf-8") as f:
         for row in csv.DictReader(f):
             key = (row["date"], int(row["hour"]))
-            effort[key] = (int(row["snapshots_analyzed"]), int(row["snapshots_dark"]))
+            effort[key] = (int(row["snapshots_analyzed"]), int(row["snapshots_dark"]),
+                           int(row.get("snapshots_murky") or 0))
             if row["common_name"]:
                 s = species[key + (row["common_name"],)]
                 s[0] += int(row["snapshots_seen"])
@@ -140,10 +141,11 @@ def read_reviews():
 
 
 def build(effort, species):
-    days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "species": defaultdict(lambda: [0, 0])})
-    for (d, _), (analyzed, dark) in effort.items():
+    days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "murky": 0, "species": defaultdict(lambda: [0, 0])})
+    for (d, _), (analyzed, dark, murky) in effort.items():
         days[d]["analyzed"] += analyzed
         days[d]["dark"] += dark
+        days[d]["murky"] += murky
     by_hour_of_day = [0] * 24
     for (d, h, name), (seen, most) in species.items():
         s = days[d]["species"][name]
@@ -157,12 +159,13 @@ def write_daily(days):
     RESULTS.mkdir(exist_ok=True)
     with DAILY_CSV.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "common_name", "snapshots_seen", "max_count"])
+        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name", "snapshots_seen",
+                    "max_count"])
         for d in sorted(days):
             day = days[d]
             rows = sorted(day["species"].items()) or [("", [0, 0])]
             for name, (seen, most) in rows:
-                w.writerow([d, day["analyzed"], day["dark"], name, seen, most])
+                w.writerow([d, day["analyzed"], day["dark"], day["murky"], name, seen, most])
 
 
 def render_validation(validation):
@@ -239,7 +242,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, env):
     cats = categories()
     first, last = min(days), max(days)
     analyzed = sum(d["analyzed"] for d in days.values())
-    daylight = sum(d["analyzed"] - d["dark"] for d in days.values())
+    daylight = sum(d["analyzed"] - d["dark"] - d["murky"] for d in days.values())  # clear-water daylight
+    murky = sum(d["murky"] for d in days.values())
 
     totals = defaultdict(lambda: {"days": 0, "seen": 0, "max": 0, "first": None, "last": None})
     for d in sorted(days):
@@ -258,7 +262,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, env):
         "|---|---|",
         f"| Days tracked | {len(days)} |",
         f"| Snapshots analyzed (one every {SNAPSHOT_SECONDS} s while streaming) | {analyzed:,} |",
-        f"| Daylight footage analyzed | {daylight * SNAPSHOT_SECONDS / 3600:,.1f} h |",
+        f"| Clear-water daylight footage analyzed | {daylight * SNAPSHOT_SECONDS / 3600:,.1f} h |",
+        f"| Daylight too murky to identify anything | {murky * SNAPSHOT_SECONDS / 3600:,.1f} h |",
         f"| Animal types seen | {sum(1 for n in totals if n != 'fish (unidentified)')} |",
         "",
         "### Animals seen",
@@ -271,7 +276,7 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, env):
         "Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many",
         "of its names a person has looked at so far, and how many were right.",
         "",
-        "| Animal | Type | Snapshots | % of daylight snapshots | Most at once | Days seen | First seen | Last seen | Checked |",
+        "| Animal | Type | Snapshots | % of clear-water snapshots | Most at once | Days seen | First seen | Last seen | Checked |",
         "|---|---|---:|---:|---:|---:|---|---|---|",
     ]
     for name, t in sorted(totals.items(), key=lambda kv: -kv[1]["seen"]):

@@ -1,6 +1,6 @@
 """Trains a classifier fitted to this camera from the answers given in the review window.
 
-Every review picture stores BioCLIP's image embedding (768 numbers describing the image), and a
+Every review picture stores BioCLIP's image embedding (1,024 numbers describing the image), and a
 person's answer is its label. A logistic regression on those embeddings learns what each animal
 looks like *on this camera* (green-blue water, blur, backlight), which zero-shot matching against
 species names can't. This script:

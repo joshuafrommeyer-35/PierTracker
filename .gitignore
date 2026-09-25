@@ -8,6 +8,7 @@ host/webview-data/
 frames/
 logs/
 data/
+sandbox/
 
 # Tracker environment and downloaded/converted models (recreate with setup_models.py)
 tracker/.venv/

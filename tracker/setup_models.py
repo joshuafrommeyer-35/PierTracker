@@ -5,13 +5,15 @@ the otherwise idle Intel iGPU without PyTorch, and precomputes the text embeddin
 for every label in species.json:
 
   * Community Fish Detector (RF-DETR Nano, Apache-2.0) - finds fish in a frame.
-  * BioCLIP 2 (imageomics/bioclip-2, MIT) - names each detected animal by comparing
-    its image embedding with the embeddings of the species names.
+  * BioCLIP 2.5 (imageomics/bioclip-2.5-vith14, MIT) - names each detected animal by
+    comparing its image embedding with the embeddings of the species names. Chosen over
+    BioCLIP 2 after a test on photos degraded to look like this camera (see the README).
 
 Run with the tracker venv:  .venv\\Scripts\\python.exe setup_models.py
 """
 
 import json
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -27,7 +29,7 @@ DETECTOR_URL = (
     "https://github.com/filippovarini/community-fish-detector/releases/download/"
     "2026.07.06-release/cfd-rf-detr-nano-640-2026.02.02.cp-011.20260706-release.pth"
 )
-BIOCLIP = "hf-hub:imageomics/bioclip-2"
+BIOCLIP = "hf-hub:imageomics/bioclip-2.5-vith14"
 
 # BioCLIP works best with taxonomic + common names; averaging a few phrasings helps.
 SPECIES_TEMPLATES = [
@@ -99,6 +101,7 @@ def export_classifier():
 
     np.save(MODELS / "label_embeddings.npy", np.stack(embeddings).astype(np.float32))
     meta = {
+        "model": BIOCLIP,
         "size": size,
         "mean": [float(v) for v in normalize.mean],
         "std": [float(v) for v in normalize.std],
@@ -112,6 +115,7 @@ def export_classifier():
 
 if __name__ == "__main__":
     MODELS.mkdir(exist_ok=True)
-    export_detector()
+    if "--classifier-only" not in sys.argv:
+        export_detector()
     export_classifier()
     print("done")
