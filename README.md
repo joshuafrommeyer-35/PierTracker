@@ -547,7 +547,7 @@ Everything the tracker sees also goes into a SQLite database, `data/piertracker.
 - `sightings`
 - `species`
 - `conditions`
-- `reviews`: answers from the review window
+- `reviews`: answers from the review window, with who gave them (`reviewer`)
 
 Questions that combine them are one query. For example, which hours had kelp bass while the water was
 2 °C above normal? The CSVs stay for the public results; the database is the place to explore.
@@ -704,7 +704,8 @@ Re-run `setup_models.py` after editing `tracker/species.json`. To publish result
 | `app\LiveCams.exe --off` | Each monitor freezes on its current cam picture (saved as a normal Windows wallpaper), then everything shuts down. Nothing keeps running. Removes the login start |
 | `app\LiveCams.exe --quit` | Shuts down without freezing; your normal wallpaper comes back |
 | Click the empty desktop on a cam's monitor | Resumes that cam, or reloads it if it's broken. On the underwater monitor: go live again |
-| Tray icon (wave) | Status on hover. Menu: review uncertain sightings, resume a cam, reload, open the folder, turn off. Double-click resumes everything. An amber dot means sightings are waiting for review |
+| Tray icon (wave) | Status on hover. Menu: review uncertain sightings, **pause cams + tracker** (for demanding games), resume a cam, reload, open the folder, turn off. Double-click resumes everything. An amber dot means sightings are waiting for review; grey means paused |
+| `app\LiveCams.exe --pause` / `--resume` | Pause: each monitor keeps a still, the cams unload and the tracker stops (its memory is freed). It stays paused, across restarts too, until resumed (or `--on`). Full-screen games already pause the cams automatically; this makes sure, e.g. for a game in a borderless window |
 | `app\LiveCams.exe --review` | The review window on its own, even while the cams are off |
 
 ### Reviewing uncertain sightings
@@ -728,6 +729,15 @@ camera-trained classifier. The top line says which kind it is:
 | `N` | Not an animal |
 | `S` or `→` | Skip for now |
 | `C` | Copy the picture, to paste into a chat or iNaturalist when you want help with the ID (skip it meanwhile; it stays in the queue) |
+
+Some cards show a **Suggestion** line (for example from Claude going through the queue): a second opinion
+with the reason, never applied by itself.
+
+Each answer records who gave it (`reviewer`: `person`, or `claude` for structure, empty water and clear
+lobster pictures checked by eye). Only a person's answers count toward the published **Checked** and
+**Confirmed by hand**; all answers teach the tracker. An answer to an "Is this right?" picture also
+**corrects the sighting it came from**: the database keeps the logged name and adds the corrected one
+(`corrected_name`, empty for "not an animal"), and the statistics use the correction.
 
 Decisions go to `data/review/decisions.csv`, and the pictures move to `data/review/approved` or
 `data/review/rejected`. The next daily publish lists confirmed animals under **Confirmed by hand**.

@@ -111,7 +111,8 @@ BACKGROUND_MIN_FRAMES = 4
 # 2026-09-25's labeled review pictures, each fixture against the others: 21 of 22 fixtures, no real
 # fish (0 of 59), and the lobster in its crevice kept. The kelp bass by the round growth stays below.
 FIXTURE_LOOKS = ((0.75, -1.0), (0.65, 0.80), (0.60, 0.85))
-FIXTURE_SURE_CORR = 0.90    # at a confirmed fixture's place, this alike to the background: skip the model
+FIXTURE_SURE_CORR = 0.90    # at a confirmed fixture's place, this alike to the background: skip the model...
+SHORTCUT_MAX_PX = 500       # ...for crops smaller than this; a big one (an antenna sweeping past the lens) gets a look
 # Where nobody has confirmed what's there, a named crop this alike to the background could be swaying
 # structure or an animal sitting still (a lobster in its crevice): it isn't logged, a person decides
 # (review queue). Real fish passing by scored at most 0.835 on 2026-09-25.
@@ -530,12 +531,12 @@ class FixtureGallery:
         self.model_name = model_name
         self.boxes, self.embs, self.animal, self.sources = [], [], [], set()
         try:
-            data = np.load(FIXTURE_GALLERY, allow_pickle=False)
-            if str(data["model"]) == model_name:
-                self.boxes = [tuple(float(v) for v in b) for b in data["boxes"]]
-                self.embs = list(data["embs"])
-                self.animal = [bool(a) for a in data["animal"]]
-                self.sources = set(str(x) for x in data["sources"])
+            with np.load(FIXTURE_GALLERY, allow_pickle=False) as data:  # closed after: Windows can't replace an open file
+                if str(data["model"]) == model_name:
+                    self.boxes = [tuple(float(v) for v in b) for b in data["boxes"]]
+                    self.embs = [np.array(e) for e in data["embs"]]
+                    self.animal = [bool(a) for a in data["animal"]]
+                    self.sources = set(str(x) for x in data["sources"])
         except (OSError, KeyError, ValueError):
             pass
         self.add_reviewed()
@@ -581,8 +582,14 @@ class FixtureGallery:
         return near
 
     def known_place(self, img: Image.Image, box) -> bool:
-        """Is there a confirmed fixture here?"""
-        return any(not self.animal[i] for i in self._near(img, box))
+        """Is this a confirmed fixture's place, with no confirmed animal seen here? (Where an animal
+        has been confirmed, e.g. the lobster's crevice, every crop gets the full comparison.) Big crops
+        never count: they're where something close to the lens shows up."""
+        sq = square_box(img, box)
+        if sq[2] - sq[0] >= SHORTCUT_MAX_PX:
+            return False
+        near = self._near(img, box)
+        return any(not self.animal[i] for i in near) and not any(self.animal[i] for i in near)
 
     def similarity(self, img: Image.Image, box, emb):
         """(closest confirmed fixture, closest confirmed animal) at this crop's place; 0 when none."""
@@ -597,6 +604,12 @@ class FixtureGallery:
         return fixture, animal
 
     def save(self):
+        try:
+            self._save()
+        except OSError as e:  # a helper: never let it stop a frame; it's saved again with the next change
+            log.warning("fixture gallery not saved: %s", e)
+
+    def _save(self):
         FIXTURE_GALLERY.parent.mkdir(parents=True, exist_ok=True)
         tmp = FIXTURE_GALLERY.with_name("fixture_gallery.tmp.npz")
         dim = len(self.embs[0]) if self.embs else 1024

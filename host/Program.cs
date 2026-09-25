@@ -9,12 +9,16 @@ internal static class Program
     public const string MutexName = @"Local\LiveCamsWallpaper";
     public const string OffEventName = @"Local\LiveCamsOff";   // freeze each monitor on a still, then exit
     public const string QuitEventName = @"Local\LiveCamsQuit"; // exit, leaving the normal wallpaper
+    public const string PauseEventName = @"Local\LiveCamsPause";   // cams on a still + tracker stopped, until resumed
+    public const string ResumeEventName = @"Local\LiveCamsResume";
 
     [STAThread]
     private static void Main(string[] args)
     {
         if (args.Contains("--off")) { RemoteControl.TurnOff(freeze: true); return; }
         if (args.Contains("--quit")) { RemoteControl.TurnOff(freeze: false); return; }
+        if (args.Contains("--pause")) { RemoteControl.SetPaused(true); return; }
+        if (args.Contains("--resume")) { RemoteControl.SetPaused(false); return; }
         if (args.Contains("--review"))
         {
             // The review window on its own, e.g. while the cams are turned off.
@@ -22,7 +26,11 @@ internal static class Program
             Application.Run(new ReviewForm(Path.GetDirectoryName(AppConfig.Locate())!));
             return;
         }
-        if (args.Contains("--on")) Autostart.Enable();
+        if (args.Contains("--on"))
+        {
+            Autostart.Enable();
+            RemoteControl.ClearPausedFlag(); // turning the cams on means on, not paused
+        }
 
         using var mutex = new Mutex(true, MutexName, out bool owned);
         if (!owned)
@@ -42,6 +50,23 @@ internal static class Program
 /// <summary>Lets "LiveCams.exe --off" (the OFF .bat) shut down the running instance.</summary>
 internal static class RemoteControl
 {
+    /// <summary>The flag that keeps LiveCams paused across restarts, next to livecams.json.</summary>
+    public static string PausedFlag => Path.Combine(Path.GetDirectoryName(AppConfig.Locate())!, "paused");
+
+    public static void ClearPausedFlag()
+    {
+        try { File.Delete(PausedFlag); } catch (IOException) { }
+    }
+
+    /// <summary>--pause / --resume: tells the running instance, or just sets the flag for the next start.</summary>
+    public static void SetPaused(bool paused)
+    {
+        if (paused) File.WriteAllText(PausedFlag, "");
+        else ClearPausedFlag();
+        if (EventWaitHandle.TryOpenExisting(paused ? Program.PauseEventName : Program.ResumeEventName, out var signal))
+            using (signal) signal.Set();
+    }
+
     public static void TurnOff(bool freeze)
     {
         Autostart.Disable();
@@ -91,7 +116,8 @@ internal sealed class LiveCamsApp : ApplicationContext
     private readonly string configDir;
     private readonly List<CamWindow> windows = new();
     private readonly NotifyIcon tray;
-    private readonly Icon trayIcon = MakeTrayIcon(badge: false), trayIconBadge = MakeTrayIcon(badge: true);
+    private readonly Icon trayIcon = MakeTrayIcon(badge: false), trayIconBadge = MakeTrayIcon(badge: true),
+                          trayIconPaused = MakeTrayIcon(badge: false, paused: true);
     private readonly DateTime startedAt = DateTime.UtcNow;
     private readonly System.Windows.Forms.Timer timer = new();
     private readonly ShellWatcher shellWatcher;
@@ -99,6 +125,9 @@ internal sealed class LiveCamsApp : ApplicationContext
     private readonly TrackerProcess? tracker;
     private readonly EventWaitHandle offSignal = new(false, EventResetMode.AutoReset, Program.OffEventName);
     private readonly EventWaitHandle quitSignal = new(false, EventResetMode.AutoReset, Program.QuitEventName);
+    private readonly EventWaitHandle pauseSignal = new(false, EventResetMode.AutoReset, Program.PauseEventName);
+    private readonly EventWaitHandle resumeSignal = new(false, EventResetMode.AutoReset, Program.ResumeEventName);
+    private bool paused;
     private CoreWebView2Environment? env;
     private bool ticking;
     private bool exiting;
@@ -139,6 +168,8 @@ internal sealed class LiveCamsApp : ApplicationContext
         var ui = SynchronizationContext.Current!;
         ThreadPool.RegisterWaitForSingleObject(offSignal, (_, _) => ui.Post(_ => _ = TurnOffAsync(freeze: true), null), null, -1, true);
         ThreadPool.RegisterWaitForSingleObject(quitSignal, (_, _) => ui.Post(_ => _ = TurnOffAsync(freeze: false), null), null, -1, true);
+        ThreadPool.RegisterWaitForSingleObject(pauseSignal, (_, _) => ui.Post(_ => _ = PauseAsync(), null), null, -1, false);
+        ThreadPool.RegisterWaitForSingleObject(resumeSignal, (_, _) => ui.Post(_ => _ = ResumeAsync(), null), null, -1, false);
 
         if (config.Tracker.Enabled)
             tracker = new TrackerProcess(config.Tracker, configDir);
@@ -178,7 +209,10 @@ internal sealed class LiveCamsApp : ApplicationContext
                 windows.Add(window);
                 await window.InitAsync(env);
             }
-            tracker?.Start();
+            if (File.Exists(RemoteControl.PausedFlag))
+                await PauseAsync(); // paused before a restart or reboot: stay paused
+            else
+                tracker?.Start();
             ApplyEfficiencyMode();
             timer.Start();
         }
@@ -207,10 +241,10 @@ internal sealed class LiveCamsApp : ApplicationContext
         {
             // Chromium adjusts its own process priorities now and then; keep them pinned low.
             if (DateTime.UtcNow - lastEfficiencyPass > TimeSpan.FromMinutes(1)) ApplyEfficiencyMode();
-            tracker?.KeepAlive();
+            if (!paused) tracker?.KeepAlive();
 
-            await UpdateGameModeAsync();
-            if (!gameMode)
+            if (!paused) await UpdateGameModeAsync();
+            if (!gameMode && !paused)
             {
                 bool userPresent = Native.UserIdleTime() < TimeSpan.FromSeconds(config.WatchedIdleSeconds);
                 foreach (var w in windows)
@@ -258,9 +292,57 @@ internal sealed class LiveCamsApp : ApplicationContext
         }
     }
 
+    /// <summary>
+    /// Pause (for a demanding game, or any time): each cam shows a still and unloads, and the tracker
+    /// stops and frees its memory. It stays paused, across restarts too, until resumed.
+    /// </summary>
+    private async Task PauseAsync()
+    {
+        if (paused || exiting) return;
+        paused = true;
+        File.WriteAllText(RemoteControl.PausedFlag, "");
+        Log.Write("paused (cams + tracker)");
+        desktopClicks.Enabled = false;
+        foreach (var w in windows) await w.SuspendAsync();
+        tracker?.Stop();
+        gameMode = false; // detection starts fresh on resume
+        UpdateTrayIcon();
+        UpdateTrayText();
+    }
+
+    private Task ResumeAsync()
+    {
+        if (!paused || exiting) return Task.CompletedTask;
+        paused = false;
+        RemoteControl.ClearPausedFlag();
+        Log.Write("resumed (cams + tracker)");
+        if (config.PauseDuringFullscreenApps && Native.FullscreenAppRunning())
+        {
+            gameMode = true; // a game is still up: the cams wake when it closes
+            lastFullscreenSeen = DateTime.UtcNow;
+        }
+        else
+        {
+            desktopClicks.Enabled = true;
+            foreach (var w in windows) w.Wake();
+        }
+        tracker?.Start();
+        UpdateTrayIcon();
+        UpdateTrayText();
+        return Task.CompletedTask;
+    }
+
+    private void UpdateTrayIcon()
+    {
+        var icon = paused ? trayIconPaused : pendingReviews > 0 ? trayIconBadge : trayIcon;
+        if (tray.Icon != icon) tray.Icon = icon;
+    }
+
     private void UpdateTrayText()
     {
-        string text = gameMode
+        string text = paused
+            ? "LiveCams: paused (cams + tracker). Right-click to resume."
+            : gameMode
             ? "LiveCams: paused for full-screen app"
             : string.Join("\n", windows.Select(w => $"{w.Cam.Name}: {Short(w.Status)}{(w.DisplayFrozen ? " (frozen)" : "")}"));
         if (pendingReviews > 0) text += $"\n{pendingReviews} sightings to review";
@@ -278,9 +360,17 @@ internal sealed class LiveCamsApp : ApplicationContext
         var review = items.Add($"Review uncertain sightings ({pending})...", null, (_, _) => OpenReview());
         review.Enabled = pending > 0 || reviewForm != null;
         items.Add(new ToolStripSeparator());
-        foreach (var w in windows)
-            items.Add($"Resume {w.Cam.Name}  ({Short(w.Status)})", null, async (_, _) => await w.ForceResumeAsync());
-        items.Add("Reload cams", null, (_, _) => windows.ForEach(w => w.Reload()));
+        if (paused)
+        {
+            items.Add("Resume cams + tracker", null, async (_, _) => await ResumeAsync());
+        }
+        else
+        {
+            items.Add("Pause cams + tracker (for games)", null, async (_, _) => await PauseAsync());
+            foreach (var w in windows)
+                items.Add($"Resume {w.Cam.Name}  ({Short(w.Status)})", null, async (_, _) => await w.ForceResumeAsync());
+            items.Add("Reload cams", null, (_, _) => windows.ForEach(w => w.Reload()));
+        }
         items.Add(new ToolStripSeparator());
         items.Add("Open LiveCams folder", null, (_, _) => Process.Start("explorer.exe", configDir));
         items.Add("Turn off (freeze wallpapers)", null, async (_, _) =>
@@ -317,11 +407,10 @@ internal sealed class LiveCamsApp : ApplicationContext
         if (now - lastReviewCheck < ReviewCheckInterval) return;
         lastReviewCheck = now;
         pendingReviews = ReviewForm.PendingCount(configDir);
-        var icon = pendingReviews > 0 ? trayIconBadge : trayIcon;
-        if (tray.Icon != icon) tray.Icon = icon;
+        UpdateTrayIcon();
 
         if (config.ReviewReminderHours <= 0 || pendingReviews < config.ReviewReminderMinPending) return;
-        if (gameMode || reviewForm != null || now - startedAt < NoReminderAfterStart) return;
+        if (gameMode || paused || reviewForm != null || now - startedAt < NoReminderAfterStart) return;
         if (Native.UserIdleTime() > TimeSpan.FromMinutes(1) || Native.FullscreenAppRunning()) return;
         string stamp = Path.Combine(configDir, "data", "review", "last_reminder.txt");
         if (File.Exists(stamp) && DateTime.TryParse(File.ReadAllText(stamp), null,
@@ -400,19 +489,21 @@ internal sealed class LiveCamsApp : ApplicationContext
         tray.Dispose();
         trayIcon.Dispose();
         trayIconBadge.Dispose();
+        trayIconPaused.Dispose();
         if (!wallpaperFrozen) Native.RefreshStaticWallpaper(); // repaint the normal wallpaper where the cams were
         Log.Write("exited");
         base.ExitThreadCore();
     }
 
     /// <param name="badge">Adds an amber dot: sightings are waiting for review.</param>
-    private static Icon MakeTrayIcon(bool badge)
+    /// <param name="paused">Grey: cams and tracker paused.</param>
+    private static Icon MakeTrayIcon(bool badge, bool paused = false)
     {
         using var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.FillEllipse(new SolidBrush(Color.FromArgb(0, 105, 148)), 1, 1, 30, 30);
+            g.FillEllipse(new SolidBrush(paused ? Color.FromArgb(120, 120, 120) : Color.FromArgb(0, 105, 148)), 1, 1, 30, 30);
             using var pen = new Pen(Color.White, 3);
             g.DrawBezier(pen, 5, 18, 10, 10, 15, 26, 20, 16);
             g.DrawBezier(pen, 20, 16, 23, 11, 26, 16, 28, 14);

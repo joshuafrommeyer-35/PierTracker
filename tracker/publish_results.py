@@ -142,14 +142,19 @@ def read_reviews():
 
     Returns ({animal: [times confirmed, last date]}, number rejected) for "uncertain"
     sightings, and {animal: [checked, wrong]} for "check" samples of names the tracker
-    logged. Publishes a copy of the decisions without local file names."""
+    logged. Only a person's answers count here; answers marked reviewer=claude (structure or
+    empty water checked by eye, the lobster) teach the tracker but aren't published as checks.
+    Publishes a copy of all the decisions, with who answered, without local file names."""
     confirmed, rejected, checks, rows = defaultdict(lambda: [0, ""]), 0, defaultdict(lambda: [0, 0]), []
     if DECISIONS_CSV.exists():
         with DECISIONS_CSV.open(encoding="utf-8") as f:
             for r in csv.DictReader(f):
                 kind, logged = r.get("kind") or "uncertain", r.get("logged_as") or ""
+                reviewer = r.get("reviewer") or "person"
                 rows.append([r["taken_at"], kind, logged, r["decision"], r["common_name"],
-                             r["best_guess"], r["best_guess_prob"]])
+                             r["best_guess"], r["best_guess_prob"], reviewer])
+                if reviewer != "person":
+                    continue
                 if kind == "check":
                     tally = checks[logged]
                     tally[0] += 1
@@ -163,8 +168,8 @@ def read_reviews():
     RESULTS.mkdir(exist_ok=True)
     with CONFIRMED_CSV.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["taken_at", "kind", "tracker_logged_as", "decision", "person_says", "tracker_best_guess",
-                    "tracker_best_guess_prob"])
+        w.writerow(["taken_at", "kind", "tracker_logged_as", "decision", "answer", "tracker_best_guess",
+                    "tracker_best_guess_prob", "reviewer"])
         w.writerows(sorted(rows))
     return confirmed, rejected, checks
 

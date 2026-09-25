@@ -29,10 +29,10 @@ For a point-and-click view, [DB Browser for SQLite](https://sqlitebrowser.org/) 
 | Table | One row per | Key columns |
 |---|---|---|
 | `snapshots` | frame the tracker analyzed (~every 10 s while the cam streams) | `taken_at`, `date`, `hour`, `dark`, `murky`, `visibility` |
-| `sightings` | animal type in a snapshot | `taken_at`, `common_name`, `is_school`, `count`, `confidence`, `method` |
+| `sightings` | animal type in a snapshot | `taken_at`, `common_name`, `is_school`, `count`, `confidence`, `method`, `corrected_name` (from a review answer; `''` = not an animal) |
 | `species` | animal the tracker knows | `common_name`, `scientific_name`, `category`, `look_alike_group` |
 | `conditions` | hour at the pier | `date`, `hour`, `pier_water_temp_c`, `pier_temp_anomaly_c`, `turbidity_ntu`, `tide_predicted_m`, `tide_trend`, `oni` |
-| `reviews` | answer in the review window | `kind`, `logged_as`, `decision`, `answer` |
+| `reviews` | answer in the review window | `kind`, `logged_as`, `decision`, `answer`, `reviewer` |
 | `visits` | fish followed across frames (arrival to leaving) | `started_at`, `ended_at`, `looks`, `common_name`, `confidence` |
 
 `sightings.taken_at` points at `snapshots.taken_at`, and `snapshots.date` + `snapshots.hour` point at

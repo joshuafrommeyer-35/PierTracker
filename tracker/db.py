@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS sightings (
     is_school    INTEGER NOT NULL DEFAULT 0,  -- 1 = five or more at once
     count        INTEGER NOT NULL,            -- for a school of small fish: a rough estimate
     confidence   REAL,
-    method       TEXT            -- zero-shot | camera-trained | detector only
+    method       TEXT,           -- zero-shot | camera-trained | detector only
+    corrected_name TEXT          -- from a review answer: the right animal, '' = not an animal, NULL = as logged
 );
 CREATE INDEX IF NOT EXISTS sightings_by_time ON sightings(taken_at);
 CREATE INDEX IF NOT EXISTS sightings_by_animal ON sightings(common_name);
@@ -93,7 +94,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     logged_as TEXT,     -- for checks: the name the tracker logged
     decision TEXT,      -- approved | rejected
     answer TEXT,        -- the animal the person picked (empty when rejected)
-    tracker_best_guess TEXT, tracker_best_guess_prob REAL
+    tracker_best_guess TEXT, tracker_best_guess_prob REAL,
+    reviewer TEXT       -- person (the review window) | claude (a structure/empty-water check by eye)
 );
 """
 
@@ -104,7 +106,32 @@ def connect(path: Path = None) -> sqlite3.Connection:
     con = sqlite3.connect(path, timeout=30)
     con.execute("PRAGMA journal_mode=WAL")  # readers (you, exploring) never block the tracker's writes
     con.executescript(SCHEMA)
+    migrate(con)
     return con
+
+
+def migrate(con: sqlite3.Connection):
+    """Columns added after a database was first made."""
+    for table, column in (("sightings", "corrected_name TEXT"), ("reviews", "reviewer TEXT")):
+        if column.split()[0] not in [c[1] for c in con.execute(f"PRAGMA table_info({table})")]:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
+    con.commit()
+
+
+def apply_corrections(con: sqlite3.Connection):
+    """Review answers to "is this right?" pictures correct the sighting they were taken from: the name a
+    person (or a structure check by eye) gave, or '' for not an animal. The logged name stays in
+    common_name; statistics use the corrected one. Returns how many sightings were corrected."""
+    fixed = 0
+    rows = con.execute("SELECT taken_at, logged_as, decision, answer FROM reviews WHERE kind = 'check'").fetchall()
+    for taken_at, logged_as, decision, answer in rows:
+        name = (answer or "") if decision == "approved" else ""
+        if not logged_as or name == logged_as:
+            continue  # right as logged
+        fixed += con.execute("UPDATE sightings SET corrected_name = ? WHERE taken_at = ? AND common_name = ? "
+                             "AND corrected_name IS NOT ?", (name, taken_at, logged_as, name)).rowcount
+    con.commit()
+    return fixed
 
 
 def record_snapshot(con: sqlite3.Connection, taken_at: str, dark: bool, sightings, murky=False, visibility=None):
@@ -146,12 +173,13 @@ def sync(con: sqlite3.Connection):
     decisions = LIVECAMS / "data" / "review" / "decisions.csv"
     if decisions.exists():
         with decisions.open(encoding="utf-8") as f:
-            con.executemany("INSERT OR REPLACE INTO reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+            con.executemany("INSERT OR REPLACE INTO reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
                 (r["reviewed_at"], r["taken_at"], r["image"], r.get("kind") or "uncertain", r.get("logged_as") or None,
                  r["decision"], r["common_name"] or None, r["best_guess"] or None,
-                 float(r["best_guess_prob"]) if r["best_guess_prob"] else None)
+                 float(r["best_guess_prob"]) if r["best_guess_prob"] else None, r.get("reviewer") or "person")
                 for r in csv.DictReader(f)])
     con.commit()
+    apply_corrections(con)
 
 
 def hourly(con: sqlite3.Connection):
@@ -163,10 +191,11 @@ def hourly(con: sqlite3.Connection):
         "GROUP BY date, hour", (STATS_FROM,))}
     seen = {}
     for d, h, name, n, most in con.execute(
-            "SELECT p.date, p.hour, g.common_name || CASE WHEN g.is_school THEN ' (school)' ELSE '' END, "
-            "COUNT(DISTINCT g.taken_at), MAX(g.count) "
+            "SELECT p.date, p.hour, COALESCE(g.corrected_name, g.common_name) "
+            "|| CASE WHEN g.is_school THEN ' (school)' ELSE '' END, COUNT(DISTINCT g.taken_at), MAX(g.count) "
             "FROM sightings g JOIN snapshots p ON p.taken_at = g.taken_at "
-            "WHERE p.taken_at >= ? GROUP BY 1, 2, 3", (STATS_FROM,)):
+            "WHERE p.taken_at >= ? AND COALESCE(g.corrected_name, g.common_name) <> '' GROUP BY 1, 2, 3",
+            (STATS_FROM,)):
         seen.setdefault((d, h), []).append((name, n, most))
     rows = []
     for (d, h), (n, dark, murky) in sorted(effort.items()):
@@ -179,8 +208,9 @@ def hourly(con: sqlite3.Connection):
 def sighting_times(con: sqlite3.Connection):
     """(time, animal) of every sighting since STATS_FROM, in time order: for counting encounters."""
     return [(datetime.fromisoformat(t), name) for t, name in con.execute(
-        "SELECT taken_at, common_name || CASE WHEN is_school THEN ' (school)' ELSE '' END FROM sightings "
-        "WHERE taken_at >= ? ORDER BY taken_at", (STATS_FROM,))]
+        "SELECT taken_at, COALESCE(corrected_name, common_name) || CASE WHEN is_school THEN ' (school)' ELSE '' END "
+        "FROM sightings WHERE taken_at >= ? AND COALESCE(corrected_name, common_name) <> '' ORDER BY taken_at",
+        (STATS_FROM,))]
 
 
 def backfill_sightings(con: sqlite3.Connection):

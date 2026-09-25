@@ -23,6 +23,8 @@ internal sealed class ReviewForm : Form
     private readonly List<Species> species;
     private readonly PictureBox picture = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(24, 28, 34) };
     private readonly Label info = new() { Dock = DockStyle.Top, Height = 32, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
+    private readonly Label suggestion = new() { Dock = DockStyle.Top, Height = 26, TextAlign = ContentAlignment.MiddleLeft,
+                                                Padding = new Padding(8, 0, 0, 0), ForeColor = Color.SteelBlue };
     private readonly FlowLayoutPanel guessRow = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(4) };
     private readonly ComboBox other = new() { Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label progress = new() { Dock = DockStyle.Bottom, Height = 26, ForeColor = Color.DimGray,
@@ -62,6 +64,7 @@ internal sealed class ReviewForm : Form
 
         Controls.Add(picture);
         Controls.Add(guessRow);
+        Controls.Add(suggestion);
         Controls.Add(info);
         Controls.Add(bottom);
         Controls.Add(progress);
@@ -106,6 +109,7 @@ internal sealed class ReviewForm : Form
         if (index >= items.Count)
         {
             info.Text = items.Count == 0 ? "Nothing to review." : "All done. Close this window.";
+            suggestion.Text = "";
             guesses = new();
             return;
         }
@@ -119,6 +123,11 @@ internal sealed class ReviewForm : Form
         string takenAt = doc.RootElement.GetProperty("taken_at").GetString()!;
         kind = doc.RootElement.TryGetProperty("kind", out var k) ? k.GetString()! : "uncertain";
         loggedAs = doc.RootElement.TryGetProperty("logged_as", out var l) ? l.GetString()! : "";
+        // A second opinion attached to the card (e.g. by Claude): shown, never applied on its own.
+        suggestion.Text = doc.RootElement.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.Object
+            ? $"Suggestion: {sug.GetProperty("common").GetString()}" +
+              (sug.TryGetProperty("why", out var why) ? $"  ({why.GetString()})" : "")
+            : "";
 
         string jpg = Path.ChangeExtension(json, ".jpg");
         if (File.Exists(jpg))
@@ -162,11 +171,11 @@ internal sealed class ReviewForm : Form
             var row = new[]
             {
                 DateTime.Now.ToString("s"), takenAt, Path.GetFileName(jpg), kind, loggedAs, decision, common, scientific,
-                category, best?.Common ?? "", best?.Prob.ToString("0.000") ?? "",
+                category, best?.Common ?? "", best?.Prob.ToString("0.000") ?? "", "person",
             };
             var sb = new StringBuilder();
             if (newFile)
-                sb.AppendLine("reviewed_at,taken_at,image,kind,logged_as,decision,common_name,scientific_name,category,best_guess,best_guess_prob");
+                sb.AppendLine("reviewed_at,taken_at,image,kind,logged_as,decision,common_name,scientific_name,category,best_guess,best_guess_prob,reviewer");
             sb.AppendLine(string.Join(",", row.Select(v => $"\"{v.Replace("\"", "\"\"")}\"")));
             File.AppendAllText(decisionsCsv, sb.ToString());
         }
