@@ -22,6 +22,8 @@ RESULTS = ROOT / "results"
 DAILY_CSV = RESULTS / "daily_summary.csv"
 VALIDATION_CSV = RESULTS / "validation.csv"
 CROPS = ROOT / "data" / "crops"
+DECISIONS_CSV = ROOT / "data" / "review" / "decisions.csv"
+CONFIRMED_CSV = RESULTS / "confirmed_by_hand.csv"
 README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
@@ -91,6 +93,29 @@ def update_validation():
     return totals
 
 
+def update_confirmed():
+    """Uncertain sightings a person reviewed (the LiveCams review window writes
+    data/review/decisions.csv). Publishes a copy without file names and returns
+    ({animal: [times confirmed, last date]}, number rejected)."""
+    confirmed, rejected, rows = defaultdict(lambda: [0, ""]), 0, []
+    if DECISIONS_CSV.exists():
+        with DECISIONS_CSV.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                rows.append([r["taken_at"], r["decision"], r["common_name"], r["best_guess"], r["best_guess_prob"]])
+                if r["decision"] == "approved":
+                    c = confirmed[r["common_name"]]
+                    c[0] += 1
+                    c[1] = max(c[1], r["taken_at"][:10])
+                else:
+                    rejected += 1
+    RESULTS.mkdir(exist_ok=True)
+    with CONFIRMED_CSV.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["taken_at", "decision", "common_name", "tracker_best_guess", "tracker_best_guess_prob"])
+        w.writerows(sorted(rows))
+    return confirmed, rejected
+
+
 def build(effort, species):
     days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "species": defaultdict(lambda: [0, 0])})
     for (d, _), (analyzed, dark) in effort.items():
@@ -131,7 +156,20 @@ def render_validation(validation):
     return lines
 
 
-def render(days, by_hour_of_day, validation):
+def render_confirmed(confirmed, rejected):
+    if not confirmed and not rejected:
+        return []
+    lines = ["", "### Confirmed by hand", "",
+             "Sightings the tracker wasn't sure about are saved for review. These were checked by a person: "
+             f"{sum(c for c, _ in confirmed.values()):,} confirmed as the animal below, {rejected:,} rejected "
+             "(not an animal). They are listed here separately and not added to the counts above.", "",
+             "| Animal | Confirmed | Last confirmed |", "|---|---:|---|"]
+    for name, (count, last) in sorted(confirmed.items(), key=lambda kv: -kv[1][0]):
+        lines.append(f"| {name} | {count} | {last} |")
+    return lines
+
+
+def render(days, by_hour_of_day, validation, confirmed, rejected):
     if not days:
         return "_No results yet. The tracker publishes here once a day after it starts running._"
     cats = categories()
@@ -197,7 +235,7 @@ def render(days, by_hour_of_day, validation):
         "",
         "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv).",
     ]
-    return "\n".join(lines + render_validation(validation))
+    return "\n".join(lines + render_confirmed(confirmed, rejected) + render_validation(validation))
 
 
 def update_readme(section):
@@ -215,7 +253,8 @@ def main(push=True):
     days, by_hour = build(effort, species)
     write_daily(days)
     validation = update_validation()
-    update_readme(render(days, by_hour, validation))
+    confirmed, rejected = update_confirmed()
+    update_readme(render(days, by_hour, validation, confirmed, rejected))
     if not push:
         return
     git("add", "README.md", "results")

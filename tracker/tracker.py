@@ -2,8 +2,10 @@
 
 Whenever the LiveCams wallpaper saves a new frame (frames/underwater/latest.jpg,
 about every 10 s while the stream plays), this finds fish with the Community Fish
-Detector, names each one with BioCLIP 2, checks the whole frame for big animals
-(sea lions, rays, divers...), and appends what it saw to data/sightings.csv.
+Detector, names each one with BioCLIP 2, looks for animals the fish detector won't
+box (octopus, crabs, jellies, sea lions, divers...) in the whole frame and in six
+overlapping tiles, and appends what it saw to data/sightings.csv. Sightings it isn't
+sure about are saved to data/review/pending for a person to approve or correct.
 
 Built to be invisible: the models run through OpenVINO on the Intel iGPU when there
 is one (so the CPU cores and the Radeon stay free), otherwise on two efficiency
@@ -32,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 import openvino as ov
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent
 LIVECAMS = ROOT.parent
@@ -43,6 +45,7 @@ SIGHTINGS_CSV = DATA / "sightings.csv"
 HOURLY_CSV = DATA / "hourly_summary.csv"
 HOUR_STATE = DATA / ".current_hour.json"
 CROPS = DATA / "crops"
+REVIEW = DATA / "review" / "pending"
 
 POLL_SECONDS = 2
 STALE_SECONDS = 60          # a frame older than this means the wallpaper isn't streaming
@@ -53,6 +56,11 @@ SPECIES_MIN_PROB = 0.60     # below this a detected fish is logged as unidentifi
 NEGATIVE_MIN_PROB = 0.50    # a detection this sure to be murk/kelp/piling is dropped
 SCENE_MIN_PROB = 0.70       # whole-frame check for big animals (must beat every label)
 BIG_BOX_FRACTION = 0.25     # a detection this big is the animal the whole-frame check found
+TILE_EVERY = 3              # scan the six tiles every 3rd frame (30 s): slow movers don't need more
+REVIEW_FISH_PROB = 0.25     # an unidentified fish whose best guess is at least this goes to review
+REVIEW_SCENE_PROB = 0.40    # a non-fish/big-animal guess between this and SCENE_MIN_PROB goes to review
+REVIEW_EVERY = timedelta(minutes=10)  # at most one review picture per best guess per 10 min
+REVIEW_MAX_PENDING = 300    # stop adding review pictures while this many wait
 MAX_CROPS = 12
 MIN_CROP_PX = 20
 KEEP_CROPS_DAYS = 14
@@ -164,11 +172,52 @@ def iou(a, b):
 
 
 def square_crop(img: Image.Image, box, pad=0.15):
-    """The box, padded and made square so the classifier doesn't see a squashed fish."""
+    """The box, padded and made square so the classifier doesn't see a squashed fish. Near an
+    edge the square slides inward rather than filling with black."""
     x0, y0, x1, y1 = box[:4]
-    side = max(x1 - x0, y1 - y0) * (1 + 2 * pad)
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-    return img.crop((int(cx - side / 2), int(cy - side / 2), int(cx + side / 2), int(cy + side / 2)))
+    side = min(max(x1 - x0, y1 - y0) * (1 + 2 * pad), img.width, img.height)
+    left = min(max((x0 + x1 - side) / 2, 0), img.width - side)
+    top = min(max((y0 + y1 - side) / 2, 0), img.height - side)
+    return img.crop((int(left), int(top), int(left + side), int(top + side)))
+
+
+def tile_boxes(img: Image.Image):
+    """Six overlapping squares, 3 across and 2 down, each 70% of the frame height. A small
+    octopus or crab that is lost in the whole frame fills a good part of one tile."""
+    w, h = img.size
+    side = int(h * 0.7)
+    xs = np.linspace(0, w - side, 3).astype(int)
+    ys = np.linspace(0, h - side, 2).astype(int)
+    return [(int(x), int(y), int(x) + side, int(y) + side) for y in ys for x in xs]
+
+
+def top_guesses(labels, probs, n=3):
+    """The n most likely animals (never the "not an animal" labels), for the review queue."""
+    order = [i for i in np.argsort(-probs) if not labels[i]["negative"]][:n]
+    return [{"common": labels[i]["common"], "scientific": labels[i]["scientific"],
+             "category": labels[i]["category"], "prob": round(float(probs[i]), 3)} for i in order]
+
+
+def review_card(view: Image.Image, frame: Image.Image, box, guesses, when: datetime) -> Image.Image:
+    """One picture per uncertain sighting: the close-up, where it was in the frame, and the
+    tracker's top guesses. Readable on its own in File Explorer, and shown by the review window."""
+    thumb = frame.convert("RGB")
+    scale = 540 / thumb.width
+    thumb = thumb.resize((540, int(thumb.height * scale)))
+    card = Image.new("RGB", (1000, max(440, thumb.height + 60 + 28 * (len(guesses) + 1))), (24, 28, 34))
+    close = view.convert("RGB")
+    close.thumbnail((400, 400))
+    card.paste(close, (20 + (400 - close.width) // 2, 20 + (400 - close.height) // 2))
+    draw = ImageDraw.Draw(thumb)
+    draw.rectangle([v * scale for v in box], outline=(255, 64, 64), width=3)
+    card.paste(thumb, (440, 20))
+    draw = ImageDraw.Draw(card)
+    font = ImageFont.load_default(size=18)
+    y = 40 + thumb.height
+    draw.text((440, y), when.strftime("%Y-%m-%d %H:%M:%S"), fill=(200, 200, 200), font=font)
+    for i, g in enumerate(guesses, 1):
+        draw.text((440, y + 28 * i), f"{i}. {g['common']}  {g['prob']:.0%}", fill=(240, 240, 240), font=font)
+    return card
 
 
 def is_dark(img: Image.Image) -> bool:
@@ -185,6 +234,8 @@ class Tracker:
         self.hour = self._load_hour()
         self.last_prune = datetime.min
         self.last_crop = {}
+        self.last_review = {}
+        self.frames_seen = 0
 
     def process(self, img: Image.Image, when: datetime):
         self._roll_hour(when)
@@ -214,24 +265,43 @@ class Tracker:
         m = self.models()
         found = defaultdict(lambda: [0, 0.0, None])  # common name -> [count, best probability, label]
 
-        # Big animals (sea lion, ray, diver, a lobster on the lens...) often aren't boxed as
-        # "fish", so first ask the classifier about the whole frame. It only counts when a
-        # big-animal label clearly beats every other label, fish and "murky water" included.
-        probs = m.probabilities(m.embed(img))
-        best = int(probs.argmax())
-        scene = m.labels[best]
-        if not (scene["scene"] and not scene["negative"] and probs[best] >= SCENE_MIN_PROB):
-            scene = None
-        if scene:
-            found[scene["common"]] = [1, float(probs[best]), scene]
-            self._save_crop(img, when, scene["common"], float(probs[best]))
+        def add(label, prob, count=1):
+            entry = found[label["common"]]
+            entry[0] += count
+            entry[1] = max(entry[1], prob)
+            entry[2] = label
 
+        # 1. Animals the fish detector won't box (octopus, crabs, jellies, sea lions, divers, big
+        #    rays...): ask the classifier about the whole frame, and every 3rd frame about six
+        #    tiles too. A "scene" label only counts when it beats every other label, fish and
+        #    "murky water" included; a close call goes to the review queue instead.
+        full = (0, 0, img.width, img.height)
+        self.frames_seen += 1
+        views = [full] + (tile_boxes(img) if self.frames_seen % TILE_EVERY == 0 else [])
+        whole_frame_animal = None
+        for box in views:
+            view = img if box == full else img.crop(box)
+            probs = m.probabilities(m.embed(view))
+            best = int(probs.argmax())
+            label = m.labels[best]
+            if not label["scene"] or label["negative"]:
+                continue
+            if probs[best] >= SCENE_MIN_PROB:
+                if label["common"] not in found:
+                    self._save_crop(view, when, label["common"], float(probs[best]))
+                    add(label, float(probs[best]))
+                if box == full:
+                    whole_frame_animal = label
+            elif probs[best] >= REVIEW_SCENE_PROB:
+                self._queue_review(view, img, box, top_guesses(m.labels, probs), when)
+
+        # 2. Fish: box each one, then name it.
         frame_area = img.width * img.height
         for box in m.detect(img):
             w, h = box[2] - box[0], box[3] - box[1]
             if min(w, h) < MIN_CROP_PX:
                 continue
-            if scene and w * h > BIG_BOX_FRACTION * frame_area:
+            if whole_frame_animal and w * h > BIG_BOX_FRACTION * frame_area:
                 continue  # the big animal the whole-frame check already named
             crop = square_crop(img, box)
             probs = m.probabilities(m.embed(crop))
@@ -240,16 +310,35 @@ class Tracker:
             if label["negative"] and probs[best] >= NEGATIVE_MIN_PROB:
                 continue  # murk, kelp or piling, not an animal
             if label["negative"] or probs[best] < SPECIES_MIN_PROB:
+                guesses = top_guesses(m.labels, probs)
+                if guesses and guesses[0]["prob"] >= REVIEW_FISH_PROB:
+                    self._queue_review(crop, img, box[:4], guesses, when)
                 label, prob = UNIDENTIFIED, float(box[4])  # a fish, but not sure which: don't guess
             else:
                 prob = float(probs[best])
-            entry = found[label["common"]]
-            entry[0] += 1
-            entry[1] = max(entry[1], prob)
-            entry[2] = label
+            add(label, prob)
             self._save_crop(crop, when, label["common"], prob)
 
         return [Sighting(l["common"], l["scientific"], l["category"], n, p) for n, p, l in found.values()]
+
+    def _queue_review(self, view: Image.Image, frame: Image.Image, box, guesses, when: datetime):
+        """Saves an uncertain sighting for a person to approve or correct (the "Review
+        uncertain sightings" window in the LiveCams tray menu)."""
+        name = guesses[0]["common"]
+        if when - self.last_review.get(name, datetime.min) < REVIEW_EVERY:
+            return
+        REVIEW.mkdir(parents=True, exist_ok=True)
+        if sum(1 for _ in REVIEW.glob("*.json")) >= REVIEW_MAX_PENDING:
+            return
+        self.last_review[name] = when
+        stem = REVIEW / f"{when:%Y%m%d-%H%M%S}_{file_safe(name)}"
+        review_card(view, frame, box, guesses, when).save(stem.with_suffix(".jpg"), quality=88)
+        stem.with_suffix(".json").write_text(json.dumps({
+            "taken_at": when.isoformat(timespec="seconds"),
+            "box": [round(float(v)) for v in box],
+            "guesses": guesses,
+        }, indent=1), encoding="utf-8")
+        log.info("queued for review: %s? (%.0f%%)", name, 100 * guesses[0]["prob"])
 
     def models(self) -> Models:
         """Loads the models on first use (about 2 s with the compiled-model cache)."""

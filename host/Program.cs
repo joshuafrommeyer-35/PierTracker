@@ -15,6 +15,13 @@ internal static class Program
     {
         if (args.Contains("--off")) { RemoteControl.TurnOff(freeze: true); return; }
         if (args.Contains("--quit")) { RemoteControl.TurnOff(freeze: false); return; }
+        if (args.Contains("--review"))
+        {
+            // The review window on its own, e.g. while the cams are turned off.
+            ApplicationConfiguration.Initialize();
+            Application.Run(new ReviewForm(Path.GetDirectoryName(AppConfig.Locate())!));
+            return;
+        }
         if (args.Contains("--on")) Autostart.Enable();
 
         using var mutex = new Mutex(true, MutexName, out bool owned);
@@ -95,6 +102,7 @@ internal sealed class LiveCamsApp : ApplicationContext
     private bool gameMode;
     private DateTime lastFullscreenSeen;
     private DateTime lastEfficiencyPass;
+    private ReviewForm? reviewForm;
 
     public LiveCamsApp()
     {
@@ -257,6 +265,10 @@ internal sealed class LiveCamsApp : ApplicationContext
     {
         var items = tray.ContextMenuStrip!.Items;
         items.Clear();
+        int pending = ReviewForm.PendingCount(configDir);
+        var review = items.Add($"Review uncertain sightings ({pending})...", null, (_, _) => OpenReview());
+        review.Enabled = pending > 0 || reviewForm != null;
+        items.Add(new ToolStripSeparator());
         foreach (var w in windows)
             items.Add($"Resume {w.Cam.Name}  ({Short(w.Status)})", null, async (_, _) => await w.ForceResumeAsync());
         items.Add("Reload cams", null, (_, _) => windows.ForEach(w => w.Reload()));
@@ -267,6 +279,18 @@ internal sealed class LiveCamsApp : ApplicationContext
             Autostart.Disable();
             await TurnOffAsync(freeze: true);
         });
+    }
+
+    private void OpenReview()
+    {
+        if (reviewForm is { IsDisposed: false })
+        {
+            reviewForm.Activate();
+            return;
+        }
+        reviewForm = new ReviewForm(configDir);
+        reviewForm.FormClosed += (_, _) => reviewForm = null;
+        reviewForm.Show();
     }
 
     /// <summary>

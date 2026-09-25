@@ -1,9 +1,10 @@
 {
   // Monitors are numbered left to right: 1 = 2560x1440 (primary), 2 = 1920x1080.
+  // The pier stream is 1280x720, so it goes on the 1080p screen; the 1080p underwater stream gets the big one.
   "cams": [
     {
       "name": "Scripps Pier",
-      "monitor": 1,
+      "monitor": 2,
       "page": "https://scripps.ucsd.edu/piercam",
       "iframe": "iframe[src*='5834a0733421b20545c4b584']",
       "extraBottomPx": 40,            // Surfline's toolbar under the video, pushed off-screen
@@ -11,7 +12,7 @@
     },
     {
       "name": "Under Scripps Pier",
-      "monitor": 2,
+      "monitor": 1,
       "page": "https://coollab.ucsd.edu/pierviz/",
       "iframe": "iframe[src*='hdontap.com']",
       "extraBottomPx": 0,

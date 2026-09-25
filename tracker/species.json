@@ -1,5 +1,5 @@
 {
-  "_comment": "Animals the tracker can name. Realistic for ~4 m under Scripps Pier (La Jolla). Add or remove entries, then re-run setup_models.py. 'negative' entries soak up false detections (murk, kelp, pilings) and are never logged. 'scene' entries are big animals checked against the whole frame, not just detected fish.",
+  "_comment": "Animals the tracker can name. Realistic for ~4 m under Scripps Pier (La Jolla). Add or remove entries, then re-run setup_models.py. 'negative' entries soak up false detections (murk, kelp, pilings) and are never logged. 'scene' entries are animals the fish detector won't box (octopus, crabs, jellies, mammals, divers) or big ones: they are also looked for in the whole frame and in six tiles of it.",
   "species": [
     {"common": "garibaldi", "scientific": "Hypsypops rubicundus", "category": "fish"},
     {"common": "California sheephead", "scientific": "Semicossyphus pulcher", "category": "fish"},
@@ -24,6 +24,7 @@
     {"common": "blacksmith", "scientific": "Chromis punctipinnis", "category": "fish"},
     {"common": "California corbina", "scientific": "Menticirrhus undulatus", "category": "fish"},
     {"common": "California halibut", "scientific": "Paralichthys californicus", "category": "fish"},
+    {"common": "California moray eel", "scientific": "Gymnothorax mordax", "category": "fish"},
 
     {"common": "leopard shark", "scientific": "Triakis semifasciata", "category": "shark/ray", "scene": true},
     {"common": "horn shark", "scientific": "Heterodontus francisci", "category": "shark/ray"},
@@ -37,10 +38,11 @@
 
     {"common": "California spiny lobster", "scientific": "Panulirus interruptus", "category": "invertebrate", "scene": true},
     {"common": "octopus", "scientific": "Octopus bimaculoides", "category": "invertebrate", "scene": true},
-    {"common": "sheep crab", "scientific": "Loxorhynchus grandis", "category": "invertebrate"},
+    {"common": "sheep crab", "scientific": "Loxorhynchus grandis", "category": "invertebrate", "scene": true},
+    {"common": "yellow rock crab", "scientific": "Metacarcinus anthonyi", "category": "invertebrate", "scene": true},
     {"common": "giant spined sea star", "scientific": "Pisaster giganteus", "category": "invertebrate"},
     {"common": "bat star", "scientific": "Patiria miniata", "category": "invertebrate"},
-    {"common": "California sea hare", "scientific": "Aplysia californica", "category": "invertebrate"},
+    {"common": "California sea hare", "scientific": "Aplysia californica", "category": "invertebrate", "scene": true},
     {"common": "black sea nettle jellyfish", "scientific": "Chrysaora achlyos", "category": "invertebrate", "scene": true},
     {"common": "purple-striped jellyfish", "scientific": "Chrysaora colorata", "category": "invertebrate", "scene": true},
     {"common": "Pacific sea nettle jellyfish", "scientific": "Chrysaora fuscescens", "category": "invertebrate", "scene": true},
