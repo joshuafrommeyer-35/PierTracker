@@ -209,6 +209,12 @@ flowchart LR
      ignored. A crop that looks like the background at a place **nobody has confirmed** isn't logged:
      it goes to the review queue, so a person decides whether it's swaying growth or a lobster sitting
      still. Everything else is logged as usual. Each review answer makes the next decision automatic.
+   - **Look-alikes of confirmed animals.** The model has never been taught what a spiny lobster's
+     antenna looks like through this water, and called it a stingray or a ray. A crop that looks almost
+     exactly like a picture a person confirmed as a non-fish animal, at the same place (similarity 0.82+),
+     is logged as that animal instead. On the first day's review pictures that caught about 14 of 17
+     antenna pictures and none of 155 others; a text label for "lobster antenna" had helped only 1 in 15.
+     Fish names are left to the camera-trained classifier.
      See Validation, section 4.
 5. **Fish.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
    (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) boxes fish above 0.35 confidence, and

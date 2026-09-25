@@ -100,3 +100,24 @@ def test_reference_classifier_mix_is_a_distribution():
 def test_square_crop_stays_inside_the_frame():
     x0, y0, x1, y1 = T.square_box(FRAME, (1880, 1040, 1920, 1080))
     assert x0 >= 0 and y0 >= 0 and x1 <= 1920 and y1 <= 1080 and x1 - x0 == y1 - y0
+
+
+def test_confirmed_animals_are_remembered_by_name(gallery, tmp_path, monkeypatch):
+    """An approved review picture carries the animal's name, so a near-identical crop at the same place
+    can be logged as that animal (the lobster's antenna, which the model calls a stingray)."""
+    (tmp_path / "approved").mkdir()
+    antenna = unit(5)
+    card = {"embedding_model": "model-a", "embedding": antenna.tolist(), "box": list(DEN)}
+    (tmp_path / "approved" / "20260925-130430_diamond-stingray.json").write_text(json.dumps(card), encoding="utf-8")
+    decisions = tmp_path / "decisions.csv"
+    decisions.write_text("reviewed_at,taken_at,image,kind,logged_as,decision,common_name,scientific_name,category,"
+                         "best_guess,best_guess_prob,reviewer\n"
+                         '"x","2026-09-25T13:04:30","20260925-130430_diamond-stingray.jpg","check","diamond stingray",'
+                         '"approved","California spiny lobster","","invertebrate","diamond stingray","0.9","person"\n',
+                         encoding="utf-8")
+    monkeypatch.setattr(T, "DECISIONS", decisions)
+    gallery.add_reviewed()
+    fixture, animal, name = gallery.similarity(FRAME, DEN, antenna)
+    assert name == "California spiny lobster" and animal > 0.99 and fixture == 0.0
+    reloaded = T.FixtureGallery("model-a")
+    assert reloaded.names == ["California spiny lobster"]  # the name survives saving

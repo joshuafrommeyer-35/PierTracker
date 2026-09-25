@@ -18,6 +18,7 @@ new frames arrive and this just sleeps.
 Needs the files made by setup_models.py.
 """
 
+import csv
 import ctypes
 import gc
 import io
@@ -123,6 +124,12 @@ SHORTCUT_MAX_PX = 500       # ...for crops smaller than this; a big one (an ante
 # (review queue). Real fish passing by scored at most 0.835 on 2026-09-25.
 SUSPECT_CORR = 0.85
 ANIMAL_LOOKS = 0.75         # this alike to a confirmed animal at the same place: trusted, logged
+# This alike to a picture a person confirmed as a non-fish animal, at the same place: logged as that
+# animal whatever the model says (the lobster's antenna, which it calls a stingray). On 2026-09-25's
+# review pictures: ~14 of 17 antenna pictures, none of 155 others. Fish names are left to the
+# camera-trained classifier, which is cross-checked on many answers.
+ANIMAL_NAME_SIM = 0.82
+DECISIONS = DATA / "review" / "decisions.csv"
 GALLERY_MAX = 3000
 CAMERA_MIN_PROB = 0.70      # the camera-trained classifier's answer is used when it's at least this sure
 REVIEW_FISH_PROB = 0.25     # an unidentified (big enough) fish whose best guess is at least this goes to review
@@ -275,6 +282,9 @@ class Models:
             return name, float(p[best])
         label = self.groups.get(name) or next((l for l in self.labels if l["common"] == name), None)
         return (label, float(p[best])) if label else None
+
+    def label_named(self, name: str):
+        return next((l for l in self.labels if l["common"] == name and not l["negative"]), None)
 
     def reference_opinion(self, embedding: np.ndarray, subset=None):
         """Shadow mode: what the classifier trained on reference photos would call this, as
@@ -589,31 +599,40 @@ class FixtureGallery:
 
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self.boxes, self.embs, self.animal, self.sources = [], [], [], set()
+        self.boxes, self.embs, self.animal, self.names, self.sources = [], [], [], [], set()
         try:
             with np.load(FIXTURE_GALLERY, allow_pickle=False) as data:  # closed after: Windows can't replace an open file
-                if str(data["model"]) == model_name:
+                if str(data["model"]) == model_name and "names" in data.files:  # older files: rebuilt from the answers
                     self.boxes = [tuple(float(v) for v in b) for b in data["boxes"]]
                     self.embs = [np.array(e) for e in data["embs"]]
                     self.animal = [bool(a) for a in data["animal"]]
+                    self.names = [str(n) for n in data["names"]]
                     self.sources = set(str(x) for x in data["sources"])
         except (OSError, KeyError, ValueError):
             pass
         self.add_reviewed()
 
-    def add(self, box, emb, animal: bool, source: str):
+    def add(self, box, emb, animal: bool, source: str, name: str = ""):
         if source in self.sources:
             return
         self.sources.add(source)
         self.boxes.append(tuple(float(v) for v in box[:4]))
         self.embs.append(np.asarray(emb, np.float32) / np.linalg.norm(emb))
         self.animal.append(animal)
+        self.names.append(name if animal else "")
         if len(self.embs) > GALLERY_MAX:
-            del self.boxes[0], self.embs[0], self.animal[0]
+            del self.boxes[0], self.embs[0], self.animal[0], self.names[0]
 
     def add_reviewed(self):
-        """New review answers: "not an animal" pictures are fixtures, approved ones animals."""
+        """New review answers: "not an animal" pictures are fixtures, approved ones animals (with the name
+        given in the review window)."""
         before = len(self.sources)
+        answers = {}
+        try:
+            with DECISIONS.open(encoding="utf-8") as f:
+                answers = {r["image"]: r["common_name"] for r in csv.DictReader(f) if r["decision"] == "approved"}
+        except OSError:
+            pass
         for decision, folder in REVIEWED.items():
             for card in folder.glob("*.json") if folder.exists() else []:
                 if card.name in self.sources:
@@ -624,7 +643,8 @@ class FixtureGallery:
                     continue
                 if d.get("embedding_model") == self.model_name and d.get("embedding") and d.get("box"):
                     self.add(square_box(Image.new("L", (1920, 1080)), d["box"]), d["embedding"],
-                             animal=decision == "approved", source=card.name)
+                             animal=decision == "approved", source=card.name,
+                             name=answers.get(card.with_suffix(".jpg").name, ""))
         if len(self.sources) != before:
             self.save()
 
@@ -652,16 +672,19 @@ class FixtureGallery:
         return any(not self.animal[i] for i in near) and not any(self.animal[i] for i in near)
 
     def similarity(self, img: Image.Image, box, emb):
-        """(closest confirmed fixture, closest confirmed animal) at this crop's place; 0 when none."""
+        """(closest confirmed fixture, closest confirmed animal, that animal's name) at this crop's
+        place; 0 and "" when there are none."""
         e = np.asarray(emb, np.float32) / np.linalg.norm(emb)
         fixture = animal = 0.0
+        name = ""
         for i in self._near(img, box):
             sim = float(self.embs[i] @ e)
             if self.animal[i]:
-                animal = max(animal, sim)
+                if sim > animal:
+                    animal, name = sim, self.names[i]
             else:
                 fixture = max(fixture, sim)
-        return fixture, animal
+        return fixture, animal, name
 
     def save(self):
         try:
@@ -675,12 +698,13 @@ class FixtureGallery:
         dim = len(self.embs[0]) if self.embs else 1024
         np.savez(tmp, model=self.model_name, boxes=np.array(self.boxes, np.float32).reshape(-1, 4),
                  embs=np.array(self.embs, np.float32).reshape(-1, dim), animal=np.array(self.animal, bool),
+                 names=np.array(self.names, dtype=str),
                  sources=np.array(sorted(self.sources), dtype=str))
         os.replace(tmp, FIXTURE_GALLERY)
 
 
 def is_structure(similarity, background_corr: float) -> bool:
-    fixture, animal = similarity
+    fixture, animal = similarity[:2]
     return fixture > animal and any(fixture >= g and background_corr >= c for g, c in FIXTURE_LOOKS)
 
 
@@ -803,6 +827,20 @@ class Tracker:
             live.append({"box": [round(float(v)) for v in box[:4]], "name": name, "prob": round(float(prob), 3),
                          "status": status})
 
+        def log_confirmed(view, box, emb):
+            """Looks just like a picture a person confirmed as this animal: logged as it."""
+            label, sim = self.confirmed_as
+            name = label["common"]
+            visit = self.scene_visits.setdefault(name, [when, when, 0, 0.0])
+            visit[1], visit[2], visit[3] = when, visit[2] + 1, max(visit[3], sim)
+            if name not in found:
+                self._save_crop(view, when, name, sim)
+                queue(view, img, box[:4], [{"common": name, "scientific": label["scientific"],
+                                            "category": label["category"], "prob": round(sim, 3)}],
+                      when, logged_as=name, embedding=emb)
+                add(label, sim, method="confirmed look-alike")
+            seen_here(box, name, sim, "logged")
+
         # 1. Everything that isn't a fish the detector found (octopus, crabs, lobsters, jellies, sea
         #    lions, rays, divers...): look at what moved. Each moving area bigger than a small fish,
         #    and the whole frame when a lot of it moved, is compared against every label. It only
@@ -824,6 +862,9 @@ class Tracker:
             emb = m.embed(view)
             verdict = "ok" if box == full else self._structure_check(img, box, emb, corr[id(box)], record)
             if verdict == "structure":
+                continue
+            if verdict == "confirmed":
+                log_confirmed(view, box, emb)
                 continue
             probs = m.probabilities(emb)
             if verdict == "suspect":
@@ -879,6 +920,9 @@ class Tracker:
             emb = m.embed(crop)
             verdict = self._structure_check(img, box, emb, corr.get(id(box), -1), record)
             if verdict == "structure":
+                continue
+            if verdict == "confirmed":  # e.g. the lobster's antenna, which the fish detector boxed
+                log_confirmed(crop, box, emb)
                 continue
             probs = m.probabilities(emb, m.fish_idx)
             best = int(probs.argmax())
@@ -1051,8 +1095,13 @@ class Tracker:
         """"structure": looks like a confirmed fixture here, ignore it. "suspect": as alike to the
         background as structure, but nobody has confirmed what's here, so a person decides (not
         logged). "ok": log it."""
-        like_fixture, like_animal = self.gallery().similarity(img, box, emb)
-        if is_structure((like_fixture, like_animal), background_corr):
+        like_fixture, like_animal, animal_name = self.gallery().similarity(img, box, emb)
+        label = self._models.label_named(animal_name) if animal_name else None
+        if (label and like_animal >= ANIMAL_NAME_SIM and like_animal > like_fixture
+                and label["category"] not in ("fish", "shark/ray")):
+            verdict = "confirmed"
+            self.confirmed_as = (label, like_animal)
+        elif is_structure((like_fixture, like_animal), background_corr):
             verdict = "structure"
         elif background_corr >= SUSPECT_CORR and not (like_animal >= ANIMAL_LOOKS and like_animal > like_fixture):
             verdict = "suspect"
@@ -1060,7 +1109,8 @@ class Tracker:
             verdict = "ok"
         record["ignored" if verdict == "structure" else "named"].append(
             {"box": [round(v) for v in box[:4]], "background": round(background_corr, 3),
-             "like_fixture": round(like_fixture, 3), "like_animal": round(like_animal, 3), "verdict": verdict})
+             "like_fixture": round(like_fixture, 3), "like_animal": round(like_animal, 3), "verdict": verdict,
+             **({"as": animal_name} if verdict == "confirmed" else {})})
         if verdict == "structure":
             self.fixtures_ignored += 1
         return verdict
