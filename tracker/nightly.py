@@ -1,4 +1,5 @@
-"""The once-a-day job the tracker starts at the first frame after midnight (idle priority).
+"""The once-a-day job LiveCams starts just after midnight (idle priority), whether or not the tracker
+is paused; if the PC was off or asleep then, as soon as LiveCams is running again.
 
   1. Fetch the pier's conditions (environment.py), and copy them, the species list and the
      review answers into the SQLite database (db.py).
@@ -8,7 +9,8 @@
   5. With --backup <folder> (e.g. on Google Drive): copy what can't be recreated there: the database,
      the review answers, the raw CSVs, and the frame bank (kept there for good; the PC keeps 90 days).
 
-Each step runs even if an earlier one fails, and failures go to logs/nightly.log.
+Each step runs even if an earlier one fails, and failures go to logs/nightly.log. With --if-due (how
+LiveCams starts it) it does nothing if it has already run today, e.g. after a restart.
 """
 
 import logging
@@ -19,10 +21,25 @@ import sqlite3
 import sys
 import tempfile
 from contextlib import closing
+from datetime import date
 from pathlib import Path
 
 LIVECAMS = Path(__file__).resolve().parent.parent
+LAST_RUN = LIVECAMS / "data" / ".nightly_last_run"  # the date it last ran
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def first_run_today() -> bool:
+    """Marks today as done, and says whether it wasn't already. Marked at the start: a run cut off
+    halfway isn't retried the same day, and loses nothing, since every step catches up the next night."""
+    today = date.today().isoformat()
+    try:
+        done = LAST_RUN.read_text(encoding="utf-8").strip() == today
+    except OSError:
+        done = False
+    LAST_RUN.parent.mkdir(parents=True, exist_ok=True)
+    LAST_RUN.write_text(today, encoding="utf-8")
+    return not done
 
 
 def copy_safely(src: Path, dest: Path):
@@ -74,11 +91,14 @@ def backup(target: Path):
             copy_safely(frame, dest)
 
 
-def main(publish: bool, backup_dir: str = None):
+def main(publish: bool, backup_dir: str = None, if_due: bool = False):
     handler = logging.handlers.RotatingFileHandler(LIVECAMS / "logs" / "nightly.log", maxBytes=500_000,
                                                    backupCount=1, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, handlers=[handler], format="%(asctime)s %(name)s %(message)s")
     log = logging.getLogger("nightly")
+    if not first_run_today() and if_due:
+        log.info("already ran today; nothing to do")
+        return
 
     def step(name, fn):
         try:
@@ -108,4 +128,5 @@ def main(publish: bool, backup_dir: str = None):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    main(publish="--publish" in args, backup_dir=args[args.index("--backup") + 1] if "--backup" in args else None)
+    main(publish="--publish" in args, backup_dir=args[args.index("--backup") + 1] if "--backup" in args else None,
+         if_due="--if-due" in args)

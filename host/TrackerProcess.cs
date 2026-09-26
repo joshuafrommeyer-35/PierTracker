@@ -5,7 +5,8 @@ namespace LiveCams;
 
 /// <summary>
 /// Runs the Python animal tracker as a hidden child process: starts it with the
-/// wallpaper, restarts it if it dies (with a back-off), and stops it on exit.
+/// wallpaper, restarts it if it dies (with a back-off), and stops it on exit. Also starts the
+/// nightly job (tracker/nightly.py) once a day, paused or not.
 /// </summary>
 internal sealed class TrackerProcess
 {
@@ -43,9 +44,6 @@ internal sealed class TrackerProcess
 
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
-    // Lets the tracker start its nightly job outside the job, so a quit at midnight can't cut the
-    // backup or publish off halfway (the nightly job ends by itself after a few minutes).
-    private const uint JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x800;
     private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
 
     private static readonly IntPtr KillOnExitJob = CreateKillOnExitJob();
@@ -54,25 +52,28 @@ internal sealed class TrackerProcess
     {
         IntPtr job = CreateJobObject(IntPtr.Zero, null);
         var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         SetInformationJobObject(job, JobObjectExtendedLimitInformation, ref info, Marshal.SizeOf(info));
         return job; // deliberately never closed: the OS closes it when LiveCams exits
     }
 
     private readonly string python;
     private readonly string script;
+    private readonly string nightlyScript;
     private readonly string workDir;
     private readonly string stopFile;
     private readonly bool publish;
     private readonly string? backupDir;
     private Process? process;
     private DateTime lastStart = DateTime.MinValue;
+    private DateTime nightlyDay = DateTime.MinValue; // the day the nightly job was last started
 
     public TrackerProcess(TrackerConfig config, string configDir)
     {
         python = Path.GetFullPath(Path.Combine(configDir, config.Python));
         script = Path.GetFullPath(Path.Combine(configDir, config.Script));
         workDir = Path.GetDirectoryName(script)!;
+        nightlyScript = Path.Combine(workDir, "nightly.py");
         stopFile = Path.Combine(configDir, "tracker.stop"); // the tracker exits cleanly when this appears
         publish = config.PublishResults;
         backupDir = config.BackupDir;
@@ -90,9 +91,7 @@ internal sealed class TrackerProcess
         lastStart = DateTime.UtcNow;
         try
         {
-            string args = $"\"{script}\"" + (publish ? " --publish" : "") +
-                          (string.IsNullOrWhiteSpace(backupDir) ? "" : $" --backup \"{backupDir}\"");
-            process = Process.Start(new ProcessStartInfo(python, args)
+            process = Process.Start(new ProcessStartInfo(python, $"\"{script}\"")
             {
                 WorkingDirectory = workDir,
                 UseShellExecute = false,
@@ -108,6 +107,40 @@ internal sealed class TrackerProcess
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             Log.Write($"tracker failed to start: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called every tick, paused or not: the nightly job (conditions, retraining, publish, backup),
+    /// just after midnight, or at the first tick after it if the PC was asleep or LiveCams was off.
+    /// It runs outside the job object, so a quit can't cut a backup off halfway, and it does nothing
+    /// if it has already run today (--if-due), e.g. after a restart.
+    /// </summary>
+    public void RunNightlyIfDue()
+    {
+        if (DateTime.Today == nightlyDay) return;
+        nightlyDay = DateTime.Today;
+        if (!File.Exists(python) || !File.Exists(nightlyScript)) return;
+        try
+        {
+            string args = $"\"{nightlyScript}\" --if-due" + (publish ? " --publish" : "") +
+                          (string.IsNullOrWhiteSpace(backupDir) ? "" : $" --backup \"{backupDir}\"");
+            using var nightly = Process.Start(new ProcessStartInfo(python, args)
+            {
+                WorkingDirectory = workDir,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            if (nightly != null)
+            {
+                nightly.PriorityClass = ProcessPriorityClass.Idle;
+                Native.SetEfficiencyMode(nightly.Id);
+                Log.Write($"nightly job started (pid {nightly.Id})");
+            }
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Log.Write($"nightly job failed to start: {ex.Message}");
         }
     }
 

@@ -591,12 +591,14 @@ Questions that combine them are one query. For example, which hours had kelp bas
 ## Learning from the data
 
 Both pieces are built, tested, and run automatically. They switch themselves on when there's enough data.
-A nightly job (`tracker/nightly.py`, started by the tracker after midnight at idle priority) runs:
+A nightly job (`tracker/nightly.py`) runs just after midnight at idle priority, even while LiveCams is paused
+(if the PC was off or asleep, as soon as LiveCams is running again). It runs:
 
 1. `environment.py`: fetches the day's conditions.
 2. `ml/train_classifier.py`: retrains the camera classifier from the review answers.
 3. `ml/conditions_model.py`: refits "what brings animals in".
 4. `publish_results.py`: updates this README (if publishing is on).
+5. Backs up the database, review answers and frame bank to `tracker.backupDir` (if set).
 
 ### Camera-trained classifier (`tracker/ml/train_classifier.py`)
 

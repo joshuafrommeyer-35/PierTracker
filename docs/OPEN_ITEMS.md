@@ -40,7 +40,8 @@ These are built and switch themselves on; they only need time or answers.
 
 ## To watch
 
-- **First unattended nightly run** (night of 2026-09-25): results publish and the Google Drive backup.
+- **First unattended nightly run** (night of 2026-09-25, now started by LiveCams itself, so it runs while
+  paused): results publish and the Google Drive backup.
   Check `logs/nightly.log`.
 - **Fixed-thing filter**: `logs/tracker.log` lines end with "N fixed thing(s) ignored". Make sure real fish
   near the pilings still get logged (the resident kelp bass by the round growth did, 2026-09-25).

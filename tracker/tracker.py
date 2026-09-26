@@ -27,7 +27,6 @@ import logging
 import logging.handlers
 import os
 import shutil
-import subprocess
 import sys
 import time
 from collections import defaultdict, deque
@@ -709,9 +708,7 @@ def is_structure(similarity, background_corr: float) -> bool:
 
 
 class Tracker:
-    def __init__(self, publish=False, backup=None):
-        self.publish = publish
-        self.backup = backup
+    def __init__(self):
         self._models = None
         self.last_model_use = datetime.now()
         DATA.mkdir(parents=True, exist_ok=True)
@@ -1176,18 +1173,6 @@ class Tracker:
         h = self.hour
         if (h["date"], h["hour"]) == (when.date().isoformat(), when.hour):
             return
-        if h["date"] != when.date().isoformat():
-            # New day: the nightly job (conditions, retraining from review answers, the conditions
-            # model, and the public README if enabled). Idle priority, no waiting.
-            args = [sys.executable, str(ROOT / "nightly.py")] + (["--publish"] if self.publish else []) +                 (["--backup", self.backup] if self.backup else [])
-            # CREATE_NO_WINDOW | IDLE_PRIORITY_CLASS | CREATE_BREAKAWAY_FROM_JOB: outside LiveCams' job object,
-            # so quitting LiveCams at midnight doesn't cut the backup or publish off halfway.
-            flags = 0x08000000 | 0x40
-            try:
-                subprocess.Popen(args, cwd=ROOT, creationflags=flags | 0x01000000)
-            except OSError:  # not in a job, or the job doesn't allow breaking away
-                subprocess.Popen(args, cwd=ROOT, creationflags=flags)
-            log.info("new day: nightly job started")
         self.hour = self._new_hour(when)
         if self._gallery is not None:
             self._gallery.add_reviewed()  # new answers from the review window
@@ -1247,8 +1232,7 @@ def main():
                                                    backupCount=1, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, handlers=[handler], format="%(asctime)s %(message)s",
                         datefmt="%Y-%m-%d %H:%M:%S")
-    backup = sys.argv[sys.argv.index("--backup") + 1] if "--backup" in sys.argv else None
-    tracker = Tracker(publish="--publish" in sys.argv, backup=backup)
+    tracker = Tracker()
     last_mtime = None
     STOP_FILE.unlink(missing_ok=True)  # left over from a crash
     while not STOP_FILE.exists():
