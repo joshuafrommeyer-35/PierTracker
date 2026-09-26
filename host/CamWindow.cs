@@ -186,6 +186,8 @@ internal sealed class CamWindow : Form
     public string Status { get; private set; } = "starting";
     public bool DisplayFrozen => displayFrozen;
     public bool Suspended => suspended;
+    /// <summary>False once Explorer has thrown away the wallpaper layer this window lived in (e.g. it crashed).</summary>
+    public bool OnDesktop => IsHandleCreated && Native.HasParentWindow(Handle);
 
     public CamWindow(CamConfig cam, Rectangle monitor, string configDir)
     {

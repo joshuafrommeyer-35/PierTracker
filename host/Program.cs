@@ -11,6 +11,8 @@ internal static class Program
     public const string QuitEventName = @"Local\LiveCamsQuit"; // exit, leaving the normal wallpaper
     public const string PauseEventName = @"Local\LiveCamsPause";   // cams on a still + tracker stopped, until resumed
     public const string ResumeEventName = @"Local\LiveCamsResume";
+    /// <summary>How long to wait for the running instance to exit (longer than LiveCamsApp.ShutdownLimit).</summary>
+    public static readonly TimeSpan ExitWait = TimeSpan.FromSeconds(60);
 
     [STAThread]
     private static void Main(string[] args)
@@ -36,13 +38,26 @@ internal static class Program
         using var mutex = new Mutex(true, MutexName, out bool owned);
         if (!owned)
         {
-            // A restart waits for the old instance to exit; any other second launch just quits.
-            try { owned = args.Contains("--restart") && mutex.WaitOne(TimeSpan.FromSeconds(20)); }
+            // A restart waits for the old instance to exit (a stuck shutdown is cut off after
+            // LiveCamsApp.ShutdownLimit); any other second launch just quits.
+            bool restart = args.Contains("--restart");
+            try { owned = restart && mutex.WaitOne(ExitWait); }
             catch (AbandonedMutexException) { owned = true; }
-            if (!owned) return;
+            if (!owned)
+            {
+                if (restart)
+                {
+                    Log.Init(Path.Combine(Path.GetDirectoryName(AppConfig.Locate())!, "logs"));
+                    Log.Write("restart gave up: the previous instance never exited");
+                }
+                return;
+            }
         }
 
         ApplicationConfiguration.Initialize();
+        // Nobody's there to click an error dialog on a wallpaper: log errors instead.
+        Application.ThreadException += (_, e) => Log.Write($"error: {e.Exception}");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"crashed: {e.ExceptionObject}");
         Application.Run(new LiveCamsApp());
         mutex.ReleaseMutex();
     }
@@ -91,7 +106,7 @@ internal static class RemoteControl
         using var mutex = new Mutex(false, Program.MutexName);
         try
         {
-            if (mutex.WaitOne(TimeSpan.FromSeconds(30))) mutex.ReleaseMutex();
+            if (mutex.WaitOne(Program.ExitWait)) mutex.ReleaseMutex();
         }
         catch (AbandonedMutexException)
         {
@@ -124,6 +139,10 @@ internal sealed class LiveCamsApp : ApplicationContext
     private static readonly TimeSpan GameOverDelay = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ReviewCheckInterval = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan NoReminderAfterStart = TimeSpan.FromMinutes(15);
+    /// <summary>How long shutting down may take (the tracker alone gets up to 15 s) before it's cut off.</summary>
+    public static readonly TimeSpan ShutdownLimit = TimeSpan.FromSeconds(30);
+    /// <summary>A rebuild because the cams fell off the desktop happens at most this often.</summary>
+    private static readonly TimeSpan RebuildAfterStart = TimeSpan.FromMinutes(1);
 
     private readonly AppConfig config;
     private readonly string configDir;
@@ -144,6 +163,7 @@ internal sealed class LiveCamsApp : ApplicationContext
     private CoreWebView2Environment? env;
     private bool ticking;
     private bool exiting;
+    private System.Threading.Timer? shutdownWatchdog;
     private bool wallpaperFrozen;
     private bool gameMode;
     private DateTime lastFullscreenSeen;
@@ -174,11 +194,12 @@ internal sealed class LiveCamsApp : ApplicationContext
         });
 
         // Explorer restarts destroy the wallpaper layer, and monitor changes move it: rebuild from scratch.
-        shellWatcher = new ShellWatcher(() => Restart("Explorer restarted"));
+        // Posted, not run inside the watcher's window procedure, which would swallow any error.
+        var ui = SynchronizationContext.Current!;
+        shellWatcher = new ShellWatcher(() => ui.Post(_ => Restart("Explorer restarted"), null));
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
-        var ui = SynchronizationContext.Current!;
         ThreadPool.RegisterWaitForSingleObject(offSignal, (_, _) => ui.Post(_ => _ = TurnOffAsync(freeze: true), null), null, -1, true);
         ThreadPool.RegisterWaitForSingleObject(quitSignal, (_, _) => ui.Post(_ => _ = TurnOffAsync(freeze: false), null), null, -1, true);
         ThreadPool.RegisterWaitForSingleObject(pauseSignal, (_, _) => ui.Post(_ => _ = PauseAsync(), null), null, -1, false);
@@ -207,6 +228,9 @@ internal sealed class LiveCamsApp : ApplicationContext
             env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(configDir, "host", "webview-data"),
                 new CoreWebView2EnvironmentOptions(args));
             env.ProcessInfosChanged += (_, _) => ApplyEfficiencyMode();
+
+            // Right after Explorer crashes, the desktop can take a while to come back.
+            for (int i = 0; i < 60 && !Native.DesktopReady(); i++) await Task.Delay(1000);
 
             var screens = Screen.AllScreens.OrderBy(s => s.Bounds.X).ThenBy(s => s.Bounds.Y).ToArray();
             foreach (var cam in config.Cams)
@@ -252,6 +276,14 @@ internal sealed class LiveCamsApp : ApplicationContext
         ticking = true;
         try
         {
+            // Explorer throwing the wallpaper layer away without a restart notice would leave the plain
+            // wallpaper showing: rebuild (at most once a minute).
+            if (DateTime.UtcNow - startedAt > RebuildAfterStart && windows.FirstOrDefault(w => !w.OnDesktop) is { } lost)
+            {
+                Restart($"[{lost.Cam.Name}] is no longer on the desktop");
+                return;
+            }
+
             // Chromium adjusts its own process priorities now and then; keep them pinned low.
             if (DateTime.UtcNow - lastEfficiencyPass > TimeSpan.FromMinutes(1)) ApplyEfficiencyMode();
             tracker?.RunNightlyIfDue(); // paused too: under a minute at idle priority, once a day
@@ -444,7 +476,7 @@ internal sealed class LiveCamsApp : ApplicationContext
     private async Task TurnOffAsync(bool freeze)
     {
         if (exiting) return;
-        exiting = true;
+        BeginShutdown();
         timer.Stop();
         if (freeze)
         {
@@ -483,30 +515,65 @@ internal sealed class LiveCamsApp : ApplicationContext
     private void Restart(string reason)
     {
         if (exiting) return;
-        exiting = true;
         Log.Write($"restarting: {reason}");
-        Process.Start(Environment.ProcessPath!, "--restart");
+        try { Process.Start(Environment.ProcessPath!, "--restart"); }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Log.Write($"restart failed: {ex.Message}"); // keep running as is
+            return;
+        }
+        BeginShutdown();
         ExitThread();
+    }
+
+    /// <summary>
+    /// Shutting down must always finish: until this instance exits it holds the lock a new one waits
+    /// for, while showing nothing. On 2026-09-26 a cam's browser died with Explorer, closing it threw,
+    /// and the old instance sat there all night. A shutdown that hasn't finished in time is cut off.
+    /// </summary>
+    private void BeginShutdown()
+    {
+        exiting = true;
+        shutdownWatchdog ??= new System.Threading.Timer(_ =>
+        {
+            Log.Write("shutdown stuck; forcing exit");
+            Process.GetCurrentProcess().Kill();
+        }, null, ShutdownLimit, Timeout.InfiniteTimeSpan);
     }
 
     protected override void ExitThreadCore()
     {
-        exiting = true;
-        timer.Stop();
-        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
-        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-        shellWatcher.DestroyHandle();
-        desktopClicks.Dispose();
-        tracker?.Stop();
-        foreach (var w in windows) w.Dispose();
-        tray.Visible = false;
-        tray.Dispose();
-        trayIcon.Dispose();
-        trayIconBadge.Dispose();
-        trayIconPaused.Dispose();
-        if (!wallpaperFrozen) Native.RefreshStaticWallpaper(); // repaint the normal wallpaper where the cams were
+        BeginShutdown();
+        // Step by step: one that fails (e.g. closing a cam whose browser already died) is logged, and
+        // the rest still run.
+        ShutdownStep("timer", timer.Stop);
+        ShutdownStep("system events", () =>
+        {
+            SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        });
+        ShutdownStep("Explorer watcher", shellWatcher.DestroyHandle);
+        ShutdownStep("desktop clicks", desktopClicks.Dispose);
+        ShutdownStep("tracker", () => tracker?.Stop());
+        foreach (var w in windows) ShutdownStep($"[{w.Cam.Name}] window", w.Dispose);
+        ShutdownStep("tray icon", () =>
+        {
+            tray.Visible = false;
+            tray.Dispose();
+            trayIcon.Dispose();
+            trayIconBadge.Dispose();
+            trayIconPaused.Dispose();
+        });
+        // Repaint the normal wallpaper where the cams were.
+        if (!wallpaperFrozen) ShutdownStep("wallpaper", () => Native.RefreshStaticWallpaper());
         Log.Write("exited");
         base.ExitThreadCore();
+    }
+
+    private static void ShutdownStep(string what, Action step)
+    {
+        try { step(); }
+        catch (Exception ex) { Log.Write($"shutdown: {what} failed ({ex.GetType().Name}: {ex.Message})"); }
     }
 
     /// <param name="badge">Adds an amber dot: sightings are waiting for review.</param>
@@ -548,4 +615,7 @@ internal sealed class ShellWatcher : NativeWindow
         if (m.Msg == taskbarCreated) onExplorerRestart();
         base.WndProc(ref m);
     }
+
+    // A NativeWindow drops errors from its window procedure silently: at least log them.
+    protected override void OnThreadException(Exception e) => Log.Write($"error: {e}");
 }

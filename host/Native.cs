@@ -42,6 +42,23 @@ internal static class Native
     public static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
 
     [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
+
+    /// <summary>True while <paramref name="hWnd"/> still sits inside another window (e.g. the wallpaper
+    /// layer), not on its own. (GetParent can't tell: it's null for a window without WS_CHILD.)</summary>
+    public static bool HasParentWindow(IntPtr hWnd)
+    {
+        IntPtr parent = GetAncestor(hWnd, 1 /* GA_PARENT */);
+        return parent != IntPtr.Zero && parent != GetDesktopWindow() && IsWindow(parent);
+    }
+
+    [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
 
     [DllImport("user32.dll")]
@@ -102,6 +119,9 @@ internal static class Native
     /// that sits between the static wallpaper and the desktop icons), plus the
     /// SHELLDLL_DefView when running on the 24H2+ layout where they share Progman.
     /// </summary>
+    /// <summary>False while Explorer is (re)starting and the desktop isn't back yet.</summary>
+    public static bool DesktopReady() => FindWindow("Progman", null) != IntPtr.Zero;
+
     public static (IntPtr host, IntPtr defViewSibling) GetWallpaperHost()
     {
         IntPtr progman = FindWindow("Progman", null);

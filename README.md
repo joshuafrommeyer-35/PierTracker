@@ -152,7 +152,9 @@ rebroadcast.
   0% CPU, no network, no GPU. They come back 20 s after the full-screen app closes.
 - Analytics, ad and captcha scripts on the cam pages are blocked. None of them are needed to show the cams.
 - The app restarts itself if Explorer restarts or the monitor setup changes, and reloads a cam whose
-  video stops advancing for 3 minutes.
+  video stops advancing for 3 minutes. If the cams ever drop off the desktop without that notice, it
+  rebuilds them within a minute. A shutdown that fails partway is logged and finished anyway, and one
+  that hangs is cut off after 30 s, so the restart can't get stuck.
 
 ### How the tracker finds and names animals (`tracker/`)
 
