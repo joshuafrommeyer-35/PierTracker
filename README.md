@@ -228,14 +228,15 @@ flowchart LR
      precision. Fewer than five are logged as **small fish**.
    - **80 px and up** is cropped and embedded by [BioCLIP 2.5](https://huggingface.co/imageomics/bioclip-2.5-vith14),
      a vision model trained on the Tree of Life that can match an image against species names it has never
-     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 70 animals in
+     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 72 animals in
      [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
      piling...). So a blurry fish can't come out as an octopus.
    - **Look-alike groups.** Many mistakes are between look-alikes: topsmelt vs. jacksmelt vs. anchovy vs.
      sardine, or opaleye vs. halfmoon. So when no species reaches **0.85** but the model is sure it's one
      of a group (their probabilities add up to **0.90+**), the **group** is logged instead: "silversides &
      sardines", "surfperches", "sea basses", "grunts (salema, sargo)" and so on (see `species.json`).
-     Otherwise it's **fish (unidentified)**.
+     Otherwise it's **fish (unidentified)**. One species has a stricter cutoff (`min_prob`): rock wrasse
+     is only named at **0.97**, since at 0.85 it took blacksmith's name; below that it's the wrasse group.
    - **Following fish across frames.** When a fish big enough to name shows up, LiveCams is asked for
      a frame every ~3 s for 20 s (at most 10 min of this per hour). Detections close to where the fish
      was a moment ago are treated as the same fish, and it's named from the **average of all its
@@ -250,7 +251,7 @@ flowchart LR
      knows.
 6. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
    sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
-   lot of it moved, are compared against every label (70 animals + 9 "not an animal"). A "scene" animal
+   lot of it moved, are compared against every label (72 animals + 9 "not an animal"). A "scene" animal
    (marked in `species.json`) counts when it wins with at least 0.70 probability. In a small moving area
    it needs 0.90, or it has to show up again within 30 s: a real lobster stays put, but a flicker of fish
    at a piling edge doesn't.
@@ -495,7 +496,37 @@ Fishing and diving reports add seasonal and El Niño visitors: mackerel, bonito,
   called green sea turtle, so it added nothing).
 - **Also added:** "swimmer or snorkeler", next to scuba diver.
 
-The list is now **70 animals**.
+The list was then **70 animals**.
+
+**Adding species from Scripps' dive counts (2026-09-26).** A Scripps survey of La Jolla's fishes
+([Hastings et al. 2014](https://cmbc.ucsd.edu/wp-content/uploads/sites/399/2015/07/Hastings-et-al-2014-Fishes-of-La-Jolla-MPAs-.pdf))
+counted over 90,000 fish in 500 dive transects at La Jolla Cove and Boomers. Blacksmith and señorita were
+70% of them, and seven species 93%. Six of those seven were on the list; the seventh, **rock wrasse**
+(seen in every survey period), wasn't. Neither were kelp perch, dwarf perch, rainbow surfperch, kelp
+rockfish or tubesnout. (Zebraperch was: it's `zebra-perch sea chub`, *Kyphosus azureus*, its newer name.)
+
+[`tracker/ml/species_eval.py`](tracker/ml/species_eval.py) tests candidates from
+[`species_candidates.json`](tracker/ml/species_candidates.json) with the tracker's own naming rule, on
+832 camera-degraded crops of underwater reference photos of 40 fish. Scores are **weighted by the dive
+counts**, so a candidate that takes señorita or blacksmith names costs what it would on this camera,
+where they're most of the fish. A candidate is added if the weighted score rises, the species already
+listed don't lose more than 1 point, and the share of logged names that are right doesn't drop.
+
+| Candidate | Its own photos named right | Verdict |
+|---|---:|---|
+| rock wrasse | 88% | At 0.85 it took 4 of 72 blacksmith: on this camera about half its names would be wrong. **Added with a 0.97 cutoff** (below it, the wrasse group) |
+| rainbow surfperch | 29% | **Added**: helps a little, takes nothing |
+| kelp perch | 67% | Left out: takes blacksmith, opaleye and giant kelpfish names at any cutoff |
+| tubesnout | 44% | Left out: no gain |
+| kelp rockfish, dwarf perch | 4 and 2 crops | Left out: too few underwater photos to judge |
+
+With both added, on the same crops: named right, weighted **23.0% → 29.7%**; species already listed
+23.9% → 28.1% (rock wrasse's label also pulls señorita and sheephead look-alikes into the wrasse group
+instead of a wrong name); right, of the names logged, 63.8% → 66.8%; false alarms on the camera's
+background 20.3% → 19.7%; young blacksmith unchanged. The 0.97 was chosen on these same crops, so expect
+a smaller gain live; review answers are the real check.
+
+The list is now **72 animals**.
 
 **Also looked at:**
 - NOAA's [AI for protected species](https://www.fisheries.noaa.gov/new-england-mid-atlantic/science-data/using-artificial-intelligence-study-protected-species)
@@ -779,6 +810,14 @@ camera-trained classifier. The top line says which kind it is:
 
 Some cards show a **Suggestion** line (for example from Claude going through the queue): a second opinion
 with the reason, never applied by itself.
+
+**Compare panel (right).** Each guess, the suggestion, and whatever you pick from the list is shown with
+three typical reference photos and a line on how to tell it apart ("black spot at the base of the tail").
+The photos are the research-grade iNaturalist reference photos the tracker already keeps locally, chosen
+as the most typical underwater ones of each species (`reference_photos.py examples`). Blacksmith leads with
+a young one, since those are what this camera sees most. Click a photo to open it full size. The notes are
+in [`tracker/field_marks.json`](tracker/field_marks.json). If you still can't tell, skip: a wrong answer
+teaches the tracker the wrong thing, and a skipped one costs nothing.
 
 Each answer records who gave it (`reviewer`: `person`, or `claude` for structure, empty water and clear
 lobster pictures checked by eye). Only a person's answers count toward the published **Checked** and

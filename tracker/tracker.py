@@ -206,6 +206,9 @@ class Models:
         # Look-alike groups from species.json ("silversides & sardines", "jellyfish"...).
         spec = json.loads((ROOT / "species.json").read_text(encoding="utf-8"))
         self.group_of = {sp["common"]: sp["group"] for sp in spec["species"] if sp.get("group")}
+        # A stricter cutoff for species that would otherwise take a common fish's name (rock wrasse and
+        # blacksmith): below it they're named by their group.
+        self.min_prob = {sp["common"]: sp["min_prob"] for sp in spec["species"] if sp.get("min_prob")}
         members = defaultdict(list)
         for sp in spec["species"]:
             if sp.get("group"):
@@ -244,7 +247,7 @@ class Models:
         index = np.arange(len(probs)) if subset is None else subset
         animals = [k for k in range(len(probs)) if not self.labels[index[k]]["negative"]]
         best = max(animals, key=lambda k: probs[k])
-        if probs[best] >= min_prob:
+        if probs[best] >= max(min_prob, self.min_prob.get(self.labels[index[best]]["common"], 0)):
             return self.labels[index[best]], float(probs[best])
         totals = defaultdict(float)
         for k in animals:

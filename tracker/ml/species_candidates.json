@@ -1,0 +1,11 @@
+{
+ "_comment": "Species considered for species.json, tested by species_eval.py. Source for these: counted in divers' transects at La Jolla Cove and Boomers, 2002-2005 (Hastings et al. 2014, Table 3), but missing from the list. Rock wrasse was in every survey period.",
+ "candidates": [
+  {"common": "rock wrasse", "scientific": "Halichoeres semicinctus", "category": "fish", "group": "wrasses (senorita, sheephead)", "min_prob": 0.97},
+  {"common": "kelp perch", "scientific": "Brachyistius frenatus", "category": "fish", "group": "surfperches"},
+  {"common": "dwarf perch", "scientific": "Micrometrus minimus", "category": "fish", "group": "surfperches"},
+  {"common": "rainbow surfperch", "scientific": "Hypsurus caryi", "category": "fish", "group": "surfperches"},
+  {"common": "kelp rockfish", "scientific": "Sebastes atrovirens", "category": "fish"},
+  {"common": "tubesnout", "scientific": "Aulorhynchus flavidus", "category": "fish"}
+ ]
+}

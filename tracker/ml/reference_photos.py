@@ -12,6 +12,7 @@ beats the names on those real answers (MIN_ANSWERS, MIN_GAIN); the report says w
 
     tracker\\.venv\\Scripts\\python tracker\\ml\\reference_photos.py fetch     # photos, ~46 per species (~1 h)
     tracker\\.venv\\Scripts\\python tracker\\ml\\reference_photos.py embed     # through the tracker's model (~2 h, iGPU)
+    tracker\\.venv\\Scripts\\python tracker\\ml\\reference_photos.py examples  # typical photos for the review window
     tracker\\.venv\\Scripts\\python tracker\\ml\\reference_photos.py train     # fit + test -> models/reference_probe.npz
     tracker\\.venv\\Scripts\\python tracker\\ml\\reference_photos.py evaluate  # vs. people's answers (run nightly)
 
@@ -223,6 +224,48 @@ def embed():
         print("background crops", len(embs), flush=True)
 
 
+# ---------- examples for the review window ----------
+def examples(per_species=3):
+    """For the review window's compare strip: per species, the underwater reference photos most typical of
+    it (closest to the average look of its underwater photos). Blacksmith leads with a young one: they're
+    most of what this camera sees, and look nothing like the adults."""
+    ft, uw_mask = filter_text()
+    scale = json.loads((TRACKER / "models" / "classifier.json").read_text(encoding="utf-8"))["logit_scale"]
+
+    def photo(stem, folder):
+        for p in (PHOTOS / folder / f"{stem}.jpg", TEST_PHOTOS / folder / f"{stem}.jpg", JUVENILE / f"{stem}.jpg"):
+            if p.exists():
+                return p.relative_to(REF).as_posix()
+        return None
+
+    def typical(d, keep, n):
+        if not keep:
+            return []
+        centre = d["full"][keep].mean(0)
+        return [keep[i] for i in np.argsort(-(d["full"][keep] @ centre))[:n]]
+
+    out = {}
+    for sp in species_list():
+        f = EMB / f"{folder_name(sp['common'])}.npz"
+        if not f.exists():
+            continue
+        d = np.load(f)
+        z = scale * d["full"] @ ft.T
+        p = np.exp(z - z.max(1, keepdims=True))
+        wet = p[:, uw_mask].sum(1) / p.sum(1)
+        young = [k for k in range(len(d["ids"])) if d["split"][k] == "test_juvenile"]
+        adults = [k for k in range(len(d["ids"])) if d["split"][k] != "test_juvenile" and wet[k] >= UNDERWATER_MIN]
+        chosen = typical(d, young, 1) + typical(d, adults, per_species - min(len(young), 1))
+        # Surf and sport fish are mostly photographed caught: fill up with the most typical of the rest (a
+        # fish on a dock still shows its marks; an odd one out, like a photo of eggs, isn't picked).
+        rest = [k for k in range(len(d["ids"])) if k not in chosen and d["split"][k] != "test_juvenile"]
+        chosen += typical(d, rest, per_species - len(chosen))
+        paths = [photo(str(d["ids"][k]), folder_name(sp["common"])) for k in chosen]
+        out[sp["common"]] = [p for p in paths if p]
+    (REF / "examples.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    print(f"examples for {len(out)} species")
+
+
 # ---------- train ----------
 def load():
     """Reference crops (underwater photos only), test crops, background crops."""
@@ -269,6 +312,7 @@ def train():
     names = [labels[i]["common"] for i in fish]
     negative = np.array([labels[i]["negative"] for i in fish])
     group_of = {s["common"]: s.get("group") for s in species_list()}
+    min_prob = {s["common"]: s["min_prob"] for s in species_list() if s.get("min_prob")}
 
     ref_X, ref_y, test, bg = load()
     half = len(bg) // 2  # background crops are stored frame by frame: train on the first frames, test on the rest
@@ -287,7 +331,7 @@ def train():
         """The tracker's rule: a species at `cut`, else its look-alike group at max(cut + 0.05, 0.90)."""
         animal = np.where(~negative)[0]
         b = animal[int(p[animal].argmax())]
-        if p[b] >= cut:
+        if p[b] >= max(cut, min_prob.get(names[b], 0)):
             return names[b]
         totals = defaultdict(float)
         for i in animal:
@@ -409,4 +453,4 @@ def evaluate():
 
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "evaluate"
-    {"fetch": fetch, "embed": embed, "train": train, "evaluate": evaluate}[step]()
+    {"fetch": fetch, "embed": embed, "examples": examples, "train": train, "evaluate": evaluate}[step]()

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
@@ -10,6 +11,8 @@ namespace LiveCams;
 /// become the published accuracy, approved uncertain ones the "Confirmed by hand" list.
 /// Keys: 1-3 pick a guess, N = not an animal, S or Right = skip, C = copy the picture
 /// (to paste into a chat or iNaturalist when you want help with an ID; skip it meanwhile).
+/// On the right, each guess (and the suggestion, and what's picked under "Something else") is shown
+/// with typical reference photos and how to tell it apart, to check an answer against.
 /// </summary>
 internal sealed class ReviewForm : Form
 {
@@ -29,9 +32,18 @@ internal sealed class ReviewForm : Form
     private readonly ComboBox other = new() { Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label progress = new() { Dock = DockStyle.Bottom, Height = 26, ForeColor = Color.DimGray,
                                              TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0) };
+    private readonly FlowLayoutPanel compare = new() { Dock = DockStyle.Right, Width = 430, AutoScroll = true,
+                                                       FlowDirection = FlowDirection.TopDown, WrapContents = false,
+                                                       Padding = new Padding(12, 4, 8, 8) };
+    private readonly string refDir;
+    private readonly Dictionary<string, string> marks;               // tracker/field_marks.json
+    private readonly Dictionary<string, List<string>> examples;      // data/reference_photos/examples.json
+    private readonly Dictionary<string, List<string>> groupMembers;  // look-alike group -> its species
     private List<string> items = new();
     private List<Guess> guesses = new();
     private string kind = "uncertain", loggedAs = "";
+    private string? suggested;
+    private bool showing;
     private int index;
 
     public ReviewForm(string configDir)
@@ -42,14 +54,19 @@ internal sealed class ReviewForm : Form
         rejectedDir = Path.Combine(review, "rejected");
         decisionsCsv = Path.Combine(review, "decisions.csv");
         species = LoadSpecies(Path.Combine(configDir, "tracker", "species.json"));
+        groupMembers = LoadGroups(Path.Combine(configDir, "tracker", "species.json"));
+        refDir = Path.Combine(configDir, "data", "reference_photos");
+        marks = ReadJson<Dictionary<string, string>>(Path.Combine(configDir, "tracker", "field_marks.json"), "marks") ?? new();
+        examples = ReadJson<Dictionary<string, List<string>>>(Path.Combine(refDir, "examples.json"), null) ?? new();
 
         Text = "Review uncertain sightings";
-        Size = new Size(1060, 700);
+        Size = new Size(1480, 780);
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
         Font = new Font("Segoe UI", 10);
 
         other.Items.AddRange(species.Cast<object>().ToArray());
+        other.SelectedIndexChanged += (_, _) => { if (!showing) ShowCompare(); };
         progress.Text = TrainingProgress();
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(4) };
         bottom.Controls.Add(new Label { Text = "Something else:", AutoSize = true, Margin = new Padding(6, 12, 0, 0) });
@@ -63,6 +80,7 @@ internal sealed class ReviewForm : Form
         bottom.Controls.Add(MakeButton("Copy picture  (C)", CopyPicture));
 
         Controls.Add(picture);
+        Controls.Add(compare);
         Controls.Add(guessRow);
         Controls.Add(suggestion);
         Controls.Add(info);
@@ -80,6 +98,8 @@ internal sealed class ReviewForm : Form
             else return;
             e.Handled = true;
         };
+
+        FormClosed += (_, _) => ClearCompare();
 
         items = Directory.Exists(pendingDir)
             ? Directory.GetFiles(pendingDir, "*.json").OrderBy(f => f).ToList()
@@ -106,11 +126,15 @@ internal sealed class ReviewForm : Form
         picture.Image = null;
         foreach (var old in guessRow.Controls.Cast<Control>().ToList()) old.Dispose();
         index = i;
+        showing = true;
+        other.SelectedIndex = -1; // a pick from the last picture doesn't carry over
+        showing = false;
         if (index >= items.Count)
         {
             info.Text = items.Count == 0 ? "Nothing to review." : "All done. Close this window.";
             suggestion.Text = "";
             guesses = new();
+            ClearCompare();
             return;
         }
 
@@ -124,9 +148,10 @@ internal sealed class ReviewForm : Form
         kind = doc.RootElement.TryGetProperty("kind", out var k) ? k.GetString()! : "uncertain";
         loggedAs = doc.RootElement.TryGetProperty("logged_as", out var l) ? l.GetString()! : "";
         // A second opinion attached to the card (e.g. by Claude): shown, never applied on its own.
-        suggestion.Text = doc.RootElement.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.Object
-            ? $"Suggestion: {sug.GetProperty("common").GetString()}" +
-              (sug.TryGetProperty("why", out var why) ? $"  ({why.GetString()})" : "")
+        bool hasSuggestion = doc.RootElement.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.Object;
+        suggested = hasSuggestion ? sug.GetProperty("common").GetString() : null;
+        suggestion.Text = hasSuggestion
+            ? $"Suggestion: {suggested}" + (sug.TryGetProperty("why", out var why) ? $"  ({why.GetString()})" : "")
             : "";
 
         string jpg = Path.ChangeExtension(json, ".jpg");
@@ -142,6 +167,102 @@ internal sealed class ReviewForm : Form
             var guess = guesses[g];
             guessRow.Controls.Add(MakeButton($"{g + 1}. {guess.Common}  ({guess.Prob:P0})", () => Approve(guess)));
         }
+        ShowCompare();
+    }
+
+    /// <summary>
+    /// Fills the right-hand panel: for what's picked under "Something else", each guess and the suggestion,
+    /// typical reference photos (iNaturalist, research grade) and how to tell that animal apart.
+    /// </summary>
+    private void ShowCompare()
+    {
+        ClearCompare();
+        if (index >= items.Count) return;
+        var names = new List<string>();
+        if (other.SelectedIndex >= 0) names.Add(species[other.SelectedIndex].Common);
+        names.AddRange(guesses.Select(g => g.Common));
+        if (suggested != null) names.Add(suggested);
+
+        compare.SuspendLayout();
+        compare.Controls.Add(new Label { Text = "Compare with reference photos (click one to open it)", AutoSize = true,
+                                         ForeColor = Color.DimGray, Margin = new Padding(0, 6, 0, 0) });
+        int textWidth = compare.Width - 50;
+        foreach (string name in names.Distinct().Take(4))
+        {
+            compare.Controls.Add(new Label { Text = name, AutoSize = true, Font = new Font(Font, FontStyle.Bold),
+                                             Margin = new Padding(0, 12, 0, 2) });
+            string? note = marks.GetValueOrDefault(name)
+                ?? (groupMembers.TryGetValue(name, out var members) ? "A group: " + string.Join(", ", members) + "." : null);
+            if (note != null)
+                compare.Controls.Add(new Label { Text = note, AutoSize = true, MaximumSize = new Size(textWidth, 0) });
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
+            foreach (string rel in examples.GetValueOrDefault(name) ?? new())
+            {
+                string path = Path.Combine(refDir, rel);
+                Image? thumb = LoadThumbnail(path);
+                if (thumb == null) continue;
+                var box = new PictureBox { Size = new Size(124, 124), SizeMode = PictureBoxSizeMode.Zoom, Image = thumb,
+                                           BackColor = Color.FromArgb(24, 28, 34), Margin = new Padding(0, 0, 6, 0),
+                                           Cursor = Cursors.Hand };
+                box.Click += (_, _) => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                row.Controls.Add(box);
+            }
+            if (row.Controls.Count > 0) compare.Controls.Add(row);
+            else row.Dispose();
+        }
+        compare.ResumeLayout();
+    }
+
+    private void ClearCompare()
+    {
+        foreach (var old in compare.Controls.Cast<Control>().ToList())
+        {
+            foreach (var box in old.Controls.OfType<PictureBox>()) box.Image?.Dispose();
+            old.Dispose();
+        }
+    }
+
+    private static Image? LoadThumbnail(string path)
+    {
+        try
+        {
+            using var full = Image.FromStream(new MemoryStream(File.ReadAllBytes(path)));
+            double scale = 248.0 / Math.Max(full.Width, full.Height);
+            return new Bitmap(full, Math.Max(1, (int)(full.Width * scale)), Math.Max(1, (int)(full.Height * scale)));
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>A JSON file (or one property of it) as <typeparamref name="T"/>; null if it's missing or unreadable.</summary>
+    private static T? ReadJson<T>(string path, string? property) where T : class
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var el = property == null ? doc.RootElement : doc.RootElement.GetProperty(property);
+            return el.Deserialize<T>();
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or KeyNotFoundException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static Dictionary<string, List<string>> LoadGroups(string path)
+    {
+        var groups = new Dictionary<string, List<string>>();
+        if (!File.Exists(path)) return groups;
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        foreach (var s in doc.RootElement.GetProperty("species").EnumerateArray())
+            if (s.TryGetProperty("group", out var g))
+            {
+                if (!groups.TryGetValue(g.GetString()!, out var list)) groups[g.GetString()!] = list = new();
+                list.Add(s.GetProperty("common").GetString()!);
+            }
+        return groups;
     }
 
     private void CopyPicture()

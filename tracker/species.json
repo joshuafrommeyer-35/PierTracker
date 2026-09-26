@@ -1,11 +1,12 @@
 {
-  "_comment": "Animals the tracker can name. Realistic for ~4 m under Scripps Pier (La Jolla): deep-water species are left out on purpose (ocean whitefish and rockfish, common in the nearby canyon at 25+ m, took answers from juvenile blacksmith). Add or remove entries, then re-run setup_models.py. 'negative' entries soak up false detections (murk, kelp, pilings) and are never logged. 'scene' entries are animals the fish detector won't box (octopus, crabs, jellies, mammals, divers) or big ones: they are also looked for in the whole frame and in six tiles of it. 'group' ties look-alikes together: when the model can't pick between them but is sure it's one of them, the group is logged (e.g. 'silversides & sardines').",
+  "_comment": "Animals the tracker can name. Realistic for ~4 m under Scripps Pier (La Jolla): deep-water species are left out on purpose (ocean whitefish and rockfish, common in the nearby canyon at 25+ m, took answers from juvenile blacksmith). Add or remove entries, then re-run setup_models.py. 'negative' entries soak up false detections (murk, kelp, pilings) and are never logged. 'scene' entries are animals the fish detector won't box (octopus, crabs, jellies, mammals, divers) or big ones: they are also looked for in the whole frame and in six tiles of it. 'group' ties look-alikes together: when the model can't pick between them but is sure it's one of them, the group is logged (e.g. 'silversides & sardines'). 'min_prob' is a stricter cutoff for one species (rock wrasse: at the usual 0.85 it took blacksmith's name; below its cutoff it's named by its group). Test new species with ml/species_eval.py first.",
   "species": [
     {"common": "garibaldi", "scientific": "Hypsypops rubicundus", "category": "fish", "group": "damselfishes (garibaldi, blacksmith)"},
     {"common": "California sheephead", "scientific": "Semicossyphus pulcher", "category": "fish", "group": "wrasses (senorita, sheephead)"},
     {"common": "opaleye", "scientific": "Girella nigricans", "category": "fish", "group": "sea chubs (opaleye, halfmoon)"},
     {"common": "halfmoon", "scientific": "Medialuna californiensis", "category": "fish", "group": "sea chubs (opaleye, halfmoon)"},
     {"common": "senorita", "scientific": "Oxyjulis californica", "category": "fish", "group": "wrasses (senorita, sheephead)"},
+    {"common": "rock wrasse", "scientific": "Halichoeres semicinctus", "category": "fish", "group": "wrasses (senorita, sheephead)", "min_prob": 0.97},
     {"common": "kelp bass", "scientific": "Paralabrax clathratus", "category": "fish", "group": "sea basses"},
     {"common": "barred sand bass", "scientific": "Paralabrax nebulifer", "category": "fish", "group": "sea basses"},
     {"common": "giant sea bass", "scientific": "Stereolepis gigas", "category": "fish", "group": "sea basses"},
@@ -40,6 +41,7 @@
     {"common": "yellowtail amberjack", "scientific": "Seriola dorsalis", "category": "fish"},
     {"common": "white seaperch", "scientific": "Phanerodon furcatus", "category": "fish", "group": "surfperches"},
     {"common": "barred surfperch", "scientific": "Amphistichus argenteus", "category": "fish", "group": "surfperches"},
+    {"common": "rainbow surfperch", "scientific": "Hypsurus caryi", "category": "fish", "group": "surfperches"},
     {"common": "queenfish", "scientific": "Seriphus politus", "category": "fish", "group": "croakers"},
     {"common": "white croaker", "scientific": "Genyonemus lineatus", "category": "fish", "group": "croakers"},
     {"common": "yellowfin croaker", "scientific": "Umbrina roncador", "category": "fish", "group": "croakers"},
