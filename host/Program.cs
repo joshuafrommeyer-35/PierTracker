@@ -256,7 +256,10 @@ internal sealed class LiveCamsApp : ApplicationContext
         catch (Exception ex)
         {
             Log.Write($"startup failed: {ex}");
-            tray.ShowBalloonTip(10000, "LiveCams failed to start", ex.Message, ToolTipIcon.Error);
+            if (exiting) return; // cut short by a restart already under way
+            tray.ShowBalloonTip(10000, "LiveCams failed to start", ex.Message + " Trying again in a minute.", ToolTipIcon.Error);
+            await Task.Delay(TimeSpan.FromMinutes(1));
+            Restart("retrying after a failed start");
         }
     }
 
@@ -349,7 +352,7 @@ internal sealed class LiveCamsApp : ApplicationContext
         File.WriteAllText(RemoteControl.PausedFlag, "");
         Log.Write("paused (cams + tracker)");
         desktopClicks.Enabled = false;
-        foreach (var w in windows) await w.SuspendAsync();
+        foreach (var w in windows) await w.SuspendAsync("LiveCams paused · resume from the tray icon");
         tracker?.Stop();
         gameMode = false; // detection starts fresh on resume
         UpdateTrayIcon();

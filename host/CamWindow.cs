@@ -168,6 +168,7 @@ internal sealed class CamWindow : Form
     private readonly CamConfig cam;
     private readonly Rectangle monitor;
     private readonly string? captureDir;
+    private readonly string lastStillPath; // the picture shown while suspended, kept across restarts
     private readonly WebView2 web;
     private CoreWebView2Frame? camFrame;
 
@@ -195,6 +196,7 @@ internal sealed class CamWindow : Form
         this.monitor = monitor;
         if (cam.CaptureEverySeconds > 0 && !string.IsNullOrWhiteSpace(cam.CaptureDir))
             captureDir = Path.GetFullPath(Path.Combine(configDir, cam.CaptureDir));
+        lastStillPath = Path.Combine(configDir, "frames", "stills", $"suspended-monitor{cam.Monitor}.jpg");
 
         Text = $"LiveCams - {cam.Name}";
         FormBorderStyle = FormBorderStyle.None;
@@ -366,18 +368,36 @@ internal sealed class CamWindow : Form
     /// Replaces the page with a still of the current picture. The players are unloaded,
     /// so the cam then costs no CPU, GPU or network until <see cref="Wake"/>.
     /// </summary>
-    public async Task SuspendAsync()
+    /// <param name="label">A small note in the corner (e.g. that LiveCams is paused), or null.</param>
+    public async Task SuspendAsync(string? label = null)
     {
         if (suspended || web.CoreWebView2 == null) return;
         byte[]? still = await GetStillAsync();
+        // The picture is kept on disk too: LiveCams started paused (after a restart or reboot) has
+        // no live picture, and would otherwise show black.
+        try
+        {
+            if (still != null)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(lastStillPath)!);
+                await File.WriteAllBytesAsync(lastStillPath, still);
+            }
+            else if (File.Exists(lastStillPath))
+                still = await File.ReadAllBytesAsync(lastStillPath);
+        }
+        catch (IOException) { }
         suspended = true;
         suspendedStill = still;
         camFrame = null;
         string img = still == null ? "" :
             $"<img src='data:image/jpeg;base64,{Convert.ToBase64String(still)}' " +
             "style='width:100vw;height:100vh;object-fit:cover;display:block'>";
+        string note = label == null ? "" :
+            "<div style='position:fixed;top:14px;right:18px;padding:4px 10px;border-radius:10px;" +
+            "background:rgba(0,0,0,.55);color:#ddd;font:13px \"Segoe UI\",sans-serif'>" +
+            System.Net.WebUtility.HtmlEncode(label) + "</div>";
         web.CoreWebView2.NavigateToString(
-            $"<!doctype html><html><body style='margin:0;background:#000;overflow:hidden'>{img}</body></html>");
+            $"<!doctype html><html><body style='margin:0;background:#000;overflow:hidden'>{img}{note}</body></html>");
         Log.Write($"[{cam.Name}] suspended");
     }
 
