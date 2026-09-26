@@ -1,8 +1,10 @@
-# Camera classifier (2026-09-25 11:08)
+# Camera classifier (2026-09-25 22:00)
 
-0 answered pictures with embeddings. An animal is learned once it has 12 answers; ~30 makes it reliable.
+47 answered pictures with embeddings. An animal is learned once it has 12 answers; ~30 makes it reliable.
 
 | Animal | Answers | Progress |
 |---|---:|---|
+| not an animal | 43 | `##########` ready |
+| California spiny lobster | 4 | `#         `  |
 
-No answers yet.
+Not trained yet: 1 of the 3 animals needed have 12+ answers.

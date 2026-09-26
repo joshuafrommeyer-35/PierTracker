@@ -63,12 +63,15 @@ date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,snapshot
 2026-09-25,14,281,0,0,sargo,1,1
 2026-09-25,14,281,0,0,silversides & sardines,12,1
 2026-09-25,14,281,0,0,small fish (school),83,150
-2026-09-25,15,149,0,0,Pacific sardine,2,1
-2026-09-25,15,149,0,0,fish (unidentified),17,3
-2026-09-25,15,149,0,0,fish (unidentified) (school),1,5
-2026-09-25,15,149,0,0,kelp bass,12,1
-2026-09-25,15,149,0,0,mackerels & bonito,1,1
-2026-09-25,15,149,0,0,salema,6,2
-2026-09-25,15,149,0,0,silversides & sardines,7,2
-2026-09-25,15,149,0,0,small fish (school),53,100
-2026-09-25,15,149,0,0,topsmelt,1,1
+2026-09-25,15,216,0,0,California spiny lobster,3,1
+2026-09-25,15,216,0,0,Pacific sardine,2,1
+2026-09-25,15,216,0,0,fish (unidentified),20,3
+2026-09-25,15,216,0,0,fish (unidentified) (school),1,5
+2026-09-25,15,216,0,0,kelp bass,27,2
+2026-09-25,15,216,0,0,mackerels & bonito,2,1
+2026-09-25,15,216,0,0,salema,6,2
+2026-09-25,15,216,0,0,silversides & sardines,10,2
+2026-09-25,15,216,0,0,small fish (school),68,150
+2026-09-25,15,216,0,0,topsmelt,2,1
+2026-09-25,16,2,0,0,small fish (school),1,40
+2026-09-25,20,1,1,0,,0,0
