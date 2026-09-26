@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace LiveCams;
@@ -11,6 +12,8 @@ namespace LiveCams;
 internal sealed class TrackerProcess
 {
     private static readonly TimeSpan RestartDelay = TimeSpan.FromMinutes(1);
+    // The nightly job's hour: after dark here all year, and while the PC is more likely on than at midnight.
+    private const int NightlyHour = 22;
 
     // A job object that kills the tracker if LiveCams dies, even if it's killed outright.
     [StructLayout(LayoutKind.Sequential)]
@@ -66,7 +69,7 @@ internal sealed class TrackerProcess
     private readonly string? backupDir;
     private Process? process;
     private DateTime lastStart = DateTime.MinValue;
-    private DateTime nightlyDay = DateTime.MinValue; // the day the nightly job was last started
+    private DateTime nightlyDay = DateTime.MinValue; // the evening the nightly job was last started for
 
     public TrackerProcess(TrackerConfig config, string configDir)
     {
@@ -112,18 +115,20 @@ internal sealed class TrackerProcess
 
     /// <summary>
     /// Called every tick, paused or not: the nightly job (conditions, retraining, publish, backup),
-    /// just after midnight, or at the first tick after it if the PC was asleep or LiveCams was off.
+    /// at 10 pm, or at the first tick after it if the PC was asleep or LiveCams was off.
     /// It runs outside the job object, so a quit can't cut a backup off halfway, and it does nothing
-    /// if it has already run today (--if-due), e.g. after a restart.
+    /// if that evening's run has already happened (--day), e.g. after a restart.
     /// </summary>
     public void RunNightlyIfDue()
     {
-        if (DateTime.Today == nightlyDay) return;
-        nightlyDay = DateTime.Today;
+        DateTime day = DateTime.Now.AddHours(-NightlyHour).Date; // the latest evening whose run is due
+        if (day == nightlyDay) return;
+        nightlyDay = day;
         if (!File.Exists(python) || !File.Exists(nightlyScript)) return;
         try
         {
-            string args = $"\"{nightlyScript}\" --if-due" + (publish ? " --publish" : "") +
+            string args = $"\"{nightlyScript}\" --day {day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}" +
+                          (publish ? " --publish" : "") +
                           (string.IsNullOrWhiteSpace(backupDir) ? "" : $" --backup \"{backupDir}\"");
             using var nightly = Process.Start(new ProcessStartInfo(python, args)
             {

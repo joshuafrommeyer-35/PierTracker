@@ -254,7 +254,7 @@ internal sealed class LiveCamsApp : ApplicationContext
         {
             // Chromium adjusts its own process priorities now and then; keep them pinned low.
             if (DateTime.UtcNow - lastEfficiencyPass > TimeSpan.FromMinutes(1)) ApplyEfficiencyMode();
-            tracker?.RunNightlyIfDue(); // paused too: a few seconds at idle priority, once a day
+            tracker?.RunNightlyIfDue(); // paused too: under a minute at idle priority, once a day
             if (!paused) tracker?.KeepAlive();
 
             if (!paused) await UpdateGameModeAsync();
