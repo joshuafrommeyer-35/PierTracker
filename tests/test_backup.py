@@ -41,6 +41,15 @@ def test_backup_copies_everything(live):
     assert not list(target.rglob("*.partial"))  # every file swapped in whole
 
 
+def test_backup_is_one_self_contained_file(live):
+    target = live / "Drive"
+    nightly.backup(target)
+    nightly.backup(target)  # the second run reads the first copy (the size check)
+    assert not (target / "piertracker.db-wal").exists() and not (target / "piertracker.db-shm").exists()
+    with closing(sqlite3.connect(target / "piertracker.db")) as con:
+        assert con.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+
+
 def test_backup_never_overwrites_a_bigger_backup(live):
     target = live / "Drive"
     target.mkdir()

@@ -54,7 +54,13 @@ def backup(target: Path):
         # closing(): sqlite3's own "with" commits but doesn't close, which leaves the file locked on Windows
         with closing(db.connect()) as live, closing(sqlite3.connect(copy_path)) as copy:
             live.backup(copy)
+            # One self-contained file: no -wal/-shm beside it on Drive (db.connect turns WAL back on
+            # after a restore).
+            copy.execute("PRAGMA journal_mode=DELETE")
         copy_safely(copy_path, target / "piertracker.db")
+    # Left by reading an older WAL-mode copy read-only (the size check above); the new copy doesn't use them.
+    for sidecar in ("piertracker.db-wal", "piertracker.db-shm"):
+        (target / sidecar).unlink(missing_ok=True)
     for csv_file in data.glob("*.csv"):
         copy_safely(csv_file, target / csv_file.name)
     if (data / "review").exists():

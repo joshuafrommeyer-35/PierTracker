@@ -19,3 +19,6 @@ tracker.stop
 community/secrets.json
 community/submissions/
 community/apps_script.local.gs
+
+# LiveCams pause flag (kept across restarts)
+/paused
