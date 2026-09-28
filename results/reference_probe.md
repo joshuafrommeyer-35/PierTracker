@@ -17,7 +17,7 @@ Runs in **shadow mode**: see `evaluate` below for how it does on real review ans
 
 Species it knows: California moray eel, California scorpionfish, California sea hare, California sea lion, California sheephead, California spiny lobster, Pacific barracuda, Pacific sea nettle jellyfish, barred sand bass, bat ray, bat star, black perch, black sea nettle jellyfish, blacksmith, bullseye pufferfish, cabezon, diamond stingray, finescale triggerfish, garibaldi, giant kelpfish, giant spined sea star, green sea turtle, halfmoon, harbor seal, horn shark, jack mackerel, kelp bass, leopard shark, market squid, moon jellyfish, northern anchovy, octopus, opaleye, painted greenling, pelagic red crab, pile perch, purple-striped jellyfish, rainbow surfperch, rock wrasse, round stingray, rubberlip seaperch, salema, sargo, senorita, sheep crab, shiner perch, topsmelt, yellow rock crab, yellowtail amberjack, zebra-perch sea chub
 
-## On people's review answers (2026-09-26)
+## On people's review answers (2026-09-27)
 
 0 answered pictures with a shadow opinion. Not enough answers yet: 0 of the 30 needed.
 
