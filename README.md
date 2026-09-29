@@ -17,12 +17,12 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-09-28 21:02 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-28 21:01:37.
+_Last updated 2026-09-28 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-28 22:00:25.
 
 | | |
 |---|---|
 | Days tracked | 4 |
-| Snapshots analyzed (one every 10 s while streaming) | 9,513 |
+| Snapshots analyzed (one every 10 s while streaming) | 9,600 |
 | Clear-water daylight footage analyzed | 17.3 h |
 | Daylight too murky to identify anything | 0.0 h |
 | Animal types seen repeatedly or confirmed | 29 |
@@ -133,7 +133,7 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-09-28:** water 22.7 °C at ~5 m, **+2.8 °C** vs. normal for the date. Turbidity 0.57 NTU, chlorophyll 0.54 µg/L. El Niño index **+1.8** (El Niño).
+**2026-09-28:** water 22.7 °C at ~5 m, **+2.8 °C** vs. normal for the date. Turbidity 0.57 NTU, chlorophyll 0.53 µg/L. El Niño index **+1.8** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
@@ -142,7 +142,7 @@ xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
     x-axis ["09-25", "09-26", "09-27", "09-28"]
     y-axis "°C" 18 --> 24
-    line [22.76, 22.13, 22.53, 22.71]
+    line [22.76, 22.13, 22.53, 22.73]
     line [20.12, 20.06, 20.0, 19.94]
 ```
 
@@ -153,7 +153,7 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-09-25 | 22.8 | +2.6 | 0.28 | 0.50 | 33.44 | 7.25 | 7.97 | 1.57 | 1,374 |
 | 2026-09-26 | 22.1 | +2.1 | 0.24 | 0.47 | 33.43 | 7.26 | 7.96 | 1.52 | 1,465 |
 | 2026-09-27 | 22.5 | +2.5 | 0.35 | 0.55 | 33.44 | 7.20 | 7.96 | 1.69 | 226 |
-| 2026-09-28 | 22.7 | +2.8 | 0.57 | 0.54 | 33.46 | 7.12 | 7.96 | 1.70 | 1,893 |
+| 2026-09-28 | 22.7 | +2.8 | 0.57 | 0.53 | 33.46 | 7.12 | 7.96 | 1.70 | 1,893 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 

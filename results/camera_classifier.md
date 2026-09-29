@@ -1,4 +1,4 @@
-# Camera classifier (2026-09-28 20:33)
+# Camera classifier (2026-09-28 22:00)
 
 61 answered pictures with embeddings. An animal is learned once it has 12 answers; ~30 makes it reliable.
 
@@ -11,3 +11,4 @@
 | barred sand bass | 1 | `          `  |
 | jacksmelt | 1 | `          `  |
 
+Not trained yet: 1 of the 3 animals needed have 12+ answers.
