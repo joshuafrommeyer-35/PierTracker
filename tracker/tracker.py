@@ -1,13 +1,17 @@
 """Animal tracker for the Under Scripps Pier cam.
 
 Whenever the LiveCams wallpaper saves a new frame (frames/underwater/latest.jpg,
-about every 10 s while the stream plays), this finds fish with the Community Fish
+every 2 s while the stream plays), this finds fish with the Community Fish
 Detector, names the ones big enough to identify with BioCLIP 2, looks at whatever
 else moved for animals the fish detector won't box (octopus, crabs, jellies, sea
 lions, divers...), and records what it saw in the database (data/piertracker.db). The camera never
 moves, so anything that doesn't move (pilings, the hanging rope, the growth on them)
 is ignored. Sightings it isn't sure about are saved to data/review/pending for a
 person to approve or correct.
+
+One frame every ~10 s is a "snapshot": the statistics are built on those, at the same pace since
+tracking began. The frames in between catch what passes quickly (an octopus jetting across takes
+~2 s): they get a full look only when something new and solid moves, within an hourly budget.
 
 Built to be invisible: the models run through OpenVINO on the Intel iGPU when there
 is one (so the CPU cores and the Radeon stay free), otherwise on two efficiency
@@ -43,7 +47,6 @@ import db
 ROOT = Path(__file__).resolve().parent
 LIVECAMS = ROOT.parent
 FRAME = LIVECAMS / "frames" / "underwater" / "latest.jpg"
-BURST_FLAG = FRAME.parent / "burst_until"  # LiveCams captures faster until this Unix time
 # The last few minutes of daylight frames, so "did it see that?" can be answered afterwards: with a
 # .json next to a frame listing what was ignored there as fixed structure.
 RECENT = FRAME.parent / "recent"
@@ -66,17 +69,32 @@ FIXTURE_GALLERY = DATA / "fixture_gallery.npz"
 REVIEWED = {"rejected": DATA / "review" / "rejected", "approved": DATA / "review" / "approved"}
 
 POLL_SECONDS = 1
-REGULAR_SECONDS = 9          # frames closer together than this are burst frames (tracking only, not stats)
+# LiveCams saves a frame every 2 s. A frame at least this long after the last snapshot is the next
+# snapshot (one every ~10 s, as since tracking began: the statistics use only these). The others are
+# "between" frames.
+REGULAR_SECONDS = 9
+# Between frames get a full look when something new and solid moved (at least this share of its
+# area changed: a passing animal, not the loose specks of a school)...
+BETWEEN_MIN_DENSITY = 0.30
+# ...and follow the fish already being tracked, all within this much model time per hour (about a
+# quarter of the Intel iGPU's time, which is otherwise idle).
+BETWEEN_BUDGET = timedelta(minutes=15)
 # Following a fish across frames: averaging its ID over a visit was ~5 points more accurate in a test
-# (README). When a fish big enough to name is in view, LiveCams is asked for a frame every ~3 s.
+# (docs/VALIDATION.md).
 TRACK_GAP = timedelta(seconds=12)   # a fish unseen this long has left: its visit is recorded
 TRACK_MIN_DISTANCE = 150            # px: how far a fish may move between frames and still be the same one
 SCENE_VISIT_GAP = timedelta(minutes=5)  # a lobster, turtle or seal seen again within this is the same visit
-BURST_SECONDS = 20
-BURST_BUDGET = timedelta(minutes=10)  # at most this much burst time per hour
 STALE_SECONDS = 60          # a frame older than this means the wallpaper isn't streaming
 DARK_MEAN = 20              # mean brightness (0-255) below which a frame is "night"
 DARK_DETAIL = 4.0           # detail left after blurring; night sensor noise averages away to ~0
+# At dawn and dusk the picture turns to grainy grey sensor noise before it goes dark, and the model
+# called that noise "octopus" at 99%. Its colour saturation (0-255) drops to 70-110; daylight frames,
+# however dim, are 175+.
+TWILIGHT_SATURATION = 150
+# Moving patches of open water (light flickering) came out "octopus" at 90-97%. Detail at the scale of
+# an animal's outline (see structure()) is 0.3-0.45 for those and at least 0.64 for every kind of fish
+# in the tracker's saved crops (2026-09-25 to 28).
+FLAT_MAX = 0.55
 DETECT_THRESHOLD = 0.35     # fish detector confidence
 MIN_NAME_PX = 80            # fish smaller than this (longest side, 1080p frame) are too small to tell apart
 # Cutoffs measured on photos of known species degraded to look like this camera (README,
@@ -137,7 +155,8 @@ REVIEW_EVERY = timedelta(minutes=10)  # at most one "not sure" picture per best 
 REVIEW_PER_HOUR = 6         # ...and at most this many per hour
 CHECK_EVERY = timedelta(hours=1)      # a sample of confident names goes to review too: one per animal per hour...
 CHECK_PER_HOUR = 4          # ...at most this many per hour. The answers become the published accuracy.
-REVIEW_MAX_PENDING = 300    # stop adding review pictures while this many wait
+REVIEW_MAX_PENDING = 300    # at most this many review pictures wait; when full...
+RARE_PENDING = 5            # ...one of a kind with fewer than this waiting replaces the oldest of the commonest
 KEEP_PENDING_DAYS = 14      # unreviewed pictures older than this are deleted
 MAX_CROPS = 12
 MIN_CROP_PX = 20
@@ -441,11 +460,25 @@ def visibility(img: Image.Image) -> float:
 
 def is_dark(img: Image.Image) -> bool:
     """Night: too dark, no detail, or the purple-grey sensor noise this camera shows at night.
-    In daylight the water here is green, so the green channel leads."""
-    rgb = np.asarray(img.convert("RGB").resize((64, 36), Image.BOX), np.float32)
+    In daylight the water here is green, so the green channel leads. Twilight counts too: the grey,
+    grainy picture at dawn and dusk (see TWILIGHT_SATURATION)."""
+    small = img.convert("RGB").resize((64, 36), Image.BOX)
+    rgb = np.asarray(small, np.float32)
     gray = rgb.mean(axis=2)
     r, g, b = rgb.reshape(-1, 3).mean(axis=0)
-    return gray.mean() < DARK_MEAN or gray.std() < DARK_DETAIL or (g < b and g < r + 10)
+    saturation = float(np.asarray(small.convert("HSV"))[..., 1].mean())
+    return (gray.mean() < DARK_MEAN or gray.std() < DARK_DETAIL or (g < b and g < r + 10)
+            or saturation < TWILIGHT_SATURATION)
+
+
+def structure(img: Image.Image) -> float:
+    """Detail at the scale of an animal's outline: the difference between a lightly and a heavily
+    blurred copy. Open water and flickering light, smooth or lightly grainy, leave almost nothing.
+    (Heavy sensor noise doesn't: dusk and dawn are caught by their colour instead, in is_dark.)"""
+    g = img.convert("L").resize((96, 96))
+    fine = np.asarray(g.filter(ImageFilter.GaussianBlur(1.5)), np.float32)
+    coarse = np.asarray(g.filter(ImageFilter.GaussianBlur(6)), np.float32)
+    return float(np.abs(fine - coarse).mean())
 
 
 class Motion:
@@ -473,7 +506,7 @@ class Motion:
         return self.frames > MOTION_WARMUP
 
     def peek(self, img: Image.Image):
-        """Motion mask for a burst frame, without updating the background (it's tuned for ~10 s steps)."""
+        """Motion mask for a between frame, without updating the background (it's tuned for ~10 s steps)."""
         if self.background is None:
             return
         small = np.asarray(img.convert("L").resize(
@@ -705,6 +738,27 @@ class FixtureGallery:
         os.replace(tmp, FIXTURE_GALLERY)
 
 
+def make_room_for_review(name: str, folder: Path = None) -> bool:
+    """Whether a new review picture of `name` may be added. The queue holds REVIEW_MAX_PENDING; when
+    it's full, a picture of something rare (fewer than RARE_PENDING of its kind waiting) replaces the
+    oldest picture of the kind with the most waiting. So an octopus isn't turned away because 30
+    blacksmith pictures are ahead of it."""
+    folder = folder or REVIEW
+    pending = sorted(folder.glob("*.json"))  # named <time>_<animal>: sorted = oldest first
+    if len(pending) < REVIEW_MAX_PENDING:
+        return True
+    kinds = defaultdict(list)
+    for p in pending:
+        kinds[p.stem.split("_", 1)[-1]].append(p)
+    if len(kinds.get(file_safe(name), [])) >= RARE_PENDING:
+        return False
+    oldest = max(kinds.values(), key=len)[0]
+    for f in (oldest, oldest.with_suffix(".jpg")):
+        f.unlink(missing_ok=True)
+    log.info("review queue full: dropped %s to make room for %s", oldest.stem, name)
+    return True
+
+
 def is_structure(similarity, background_corr: float) -> bool:
     fixture, animal = similarity[:2]
     return fixture > animal and any(fixture >= g and background_corr >= c for g, c in FIXTURE_LOOKS)
@@ -732,14 +786,13 @@ class Tracker:
         self.tracks = []
         self.scene_visits = {}  # name -> [first seen, last seen, looks, best confidence]
         self.last_regular = None
-        self.bursts = deque()  # start times of recent bursts, for the hourly budget
+        self.between_time = deque()  # (when, seconds of model time) for between frames in the last hour
 
     def process(self, img: Image.Image, when: datetime):
         self._end_visits(when)
         self._keep_recent(img, when)
         if self.last_regular and (when - self.last_regular).total_seconds() < REGULAR_SECONDS:
-            self._burst_frame(img, when)
-            return []
+            return self._between_frame(img, when)
         self.last_regular = when
         self._roll_hour(when)
         self.hour["analyzed"] += 1
@@ -855,6 +908,10 @@ class Tracker:
         sure = fixtures + swaying
         record["ignored"] += [{"box": [round(v) for v in b[:4]], "background": round(corr[id(b)], 3)} for b in sure]
         self.fixtures_ignored = len(sure)
+        # Flickering light on open water moves too, and has no outline: not worth a look.
+        flat = [b for b in views if structure(square_crop(img, b)) < FLAT_MAX]
+        views = [b for b in views if b not in flat]
+        record["ignored"] += [{"box": [round(v) for v in b[:4]], "verdict": "open water"} for b in flat]
         views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION else []
         whole_frame_animal = None
         for box in views:
@@ -938,7 +995,6 @@ class Tracker:
             if camera and camera[0] == "not an animal":
                 continue  # learned from people's answers: this kind of thing isn't an animal
             track = self._follow(box, probs, when)
-            self._request_burst(when)
             if track.looks > 1:
                 probs = track.probs_sum / track.looks  # the visit's average look: steadier than one frame
             label, prob = camera or m.name(probs, m.fish_idx, species_cut, group_cut)
@@ -983,26 +1039,67 @@ class Tracker:
         self.tracks.append(track)
         return track
 
-    def _request_burst(self, when: datetime):
-        """Ask LiveCams for a frame every ~3 s for a while, within an hourly budget."""
-        while self.bursts and when - self.bursts[0] > timedelta(hours=1):
-            self.bursts.popleft()
-        if len(self.bursts) * timedelta(seconds=BURST_SECONDS) >= BURST_BUDGET:
-            return
-        if self.bursts and when - self.bursts[-1] < timedelta(seconds=BURST_SECONDS):
-            return  # the current burst is still running
-        self.bursts.append(when)
+    def _between_frame(self, img: Image.Image, when: datetime):
+        """A frame between two snapshots. It never counts toward the snapshot statistics. Within the
+        hourly budget of model time, it gets:
+        - a full look, like a snapshot, when something new and solid moved: what passes between two
+          snapshots (an octopus jetting across takes ~2 s). Its sightings are recorded in a between
+          frame (snapshots.regular = 0), so they count as encounters, but not as snapshots;
+        - otherwise, if fish are being followed, another look at them for their visit."""
+        if self.motion.background is None or not self._between_budget_left(when):
+            return []
+        if is_dark(img):
+            return []
+        clarity = visibility(img)
+        if clarity < VISIBILITY_POOR:
+            return []
+        started = time.perf_counter()
         try:
-            BURST_FLAG.write_text(str(int(time.time()) + BURST_SECONDS), encoding="utf-8")
-        except OSError:
-            pass
+            self.motion.peek(img)
+            if self._something_new(img, when):
+                return self._look_between(img, when, clarity)
+            if self.tracks:
+                self._follow_between(img, when)
+            return []
+        finally:
+            self.between_time.append((when, time.perf_counter() - started))
 
-    def _burst_frame(self, img: Image.Image, when: datetime):
-        """A frame between the regular ones: only used to add looks to the fish being followed."""
-        if not self.tracks or is_dark(img) or visibility(img) < VISIBILITY_POOR:
-            return
+    def _between_budget_left(self, when: datetime) -> bool:
+        while self.between_time and when - self.between_time[0][0] > timedelta(hours=1):
+            self.between_time.popleft()
+        return sum(s for _, s in self.between_time) < BETWEEN_BUDGET.total_seconds()
+
+    def _something_new(self, img: Image.Image, when: datetime) -> bool:
+        """A solid moving area bigger than a small fish that isn't a fish already being followed, a
+        fixture that sways, or flickering open water."""
+        for box in self.motion.blobs(BLOB_MIN_PX):
+            if self.motion.fraction(box) < BETWEEN_MIN_DENSITY:
+                continue
+            if any(t.near(box) and when - t.last_seen <= TRACK_GAP for t in self.tracks):
+                continue
+            if self.background.correlation(img, box) >= FIXTURE_SURE_CORR and self.gallery().known_place(img, box):
+                continue
+            if structure(square_crop(img, box)) < FLAT_MAX:
+                continue
+            return True
+        return False
+
+    def _look_between(self, img: Image.Image, when: datetime, clarity: float):
+        self.record, self.live = None, []
+        sightings = self._identify(img, when)
+        if self.record and (self.record["ignored"] or self.record["named"]):
+            (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(self.record), encoding="utf-8")
+        if sightings:
+            db.record_snapshot(self.db, when.isoformat(timespec="seconds"), False, sightings,
+                               visibility=clarity, regular=False)
+            self._bank(img, when, sightings)
+        log.info("%s: between snapshots: %s", when.strftime("%H:%M:%S"),
+                 ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing new")
+        return sightings
+
+    def _follow_between(self, img: Image.Image, when: datetime):
+        """Another look at the fish being followed, for their visit's name."""
         m = self.models()
-        self.motion.peek(img)
         for box in m.detect(img):
             if max(box[2] - box[0], box[3] - box[1]) < MIN_NAME_PX or self.motion.fraction(box) < BOX_MIN_MOTION:
                 continue
@@ -1051,7 +1148,7 @@ class Tracker:
         if len(recent) >= per_hour:
             return
         REVIEW.mkdir(parents=True, exist_ok=True)
-        if sum(1 for _ in REVIEW.glob("*.json")) >= REVIEW_MAX_PENDING:
+        if not make_room_for_review(name):
             return
         self.last_review[kind][name] = when
         recent.append(when)

@@ -29,6 +29,21 @@ internal static class Program
             Application.Run(new ReviewForm(Path.GetDirectoryName(AppConfig.Locate())!));
             return;
         }
+        if (args.Contains("--rewind"))
+        {
+            // The rewind window on its own.
+            ApplicationConfiguration.Initialize();
+            string configPath = AppConfig.Locate(), dir = Path.GetDirectoryName(configPath)!;
+            Log.Init(Path.Combine(dir, "logs"));
+            var rewind = AppConfig.Load(configPath).Cams.Select(c => c.Rewind).FirstOrDefault(r => r != null);
+            if (rewind == null)
+            {
+                MessageBox.Show("No cam keeps its video (\"rewind\" in livecams.json).", "LiveCams");
+                return;
+            }
+            Application.Run(new RewindForm(dir, new VideoStore(Path.Combine(dir, rewind.Dir))));
+            return;
+        }
         if (args.Contains("--on"))
         {
             Autostart.Enable();
@@ -169,6 +184,7 @@ internal sealed class LiveCamsApp : ApplicationContext
     private DateTime lastFullscreenSeen;
     private DateTime lastEfficiencyPass;
     private ReviewForm? reviewForm;
+    private RewindForm? rewindForm;
     private int pendingReviews;
     private DateTime lastReviewCheck;
 
@@ -408,6 +424,11 @@ internal sealed class LiveCamsApp : ApplicationContext
         int pending = ReviewForm.PendingCount(configDir);
         var review = items.Add($"Review uncertain sightings ({pending})...", null, (_, _) => OpenReview());
         review.Enabled = pending > 0 || reviewForm != null;
+        if (Video != null)
+        {
+            items.Add("Rewind the underwater cam...", null, (_, _) => OpenRewind(null));
+            items.Add("Just saw something? Keep the last 5 minutes", null, async (_, _) => await KeepRecentAsync());
+        }
         items.Add(new ToolStripSeparator());
         if (paused)
         {
@@ -427,6 +448,38 @@ internal sealed class LiveCamsApp : ApplicationContext
             Autostart.Disable();
             await TurnOffAsync(freeze: true);
         });
+    }
+
+    private VideoStore? Video => windows.Select(w => w.Video).FirstOrDefault(v => v != null);
+
+    /// <param name="at">The moment to open at; null = the most recent video.</param>
+    private void OpenRewind(DateTime? at)
+    {
+        if (Video is not { } video) return;
+        if (rewindForm is { IsDisposed: false })
+        {
+            if (at is { } t) rewindForm.ShowMoment(t);
+            rewindForm.Activate();
+            return;
+        }
+        rewindForm = new RewindForm(configDir, video, at);
+        rewindForm.FormClosed += (_, _) => rewindForm = null;
+        rewindForm.Show();
+    }
+
+    /// <summary>"I just saw something": the last 5 minutes are kept for good, and the rewind window opens a minute back.</summary>
+    private async Task KeepRecentAsync()
+    {
+        if (Video is not { } video) return;
+        var now = DateTime.Now;
+        string? clip = await video.SaveClipAsync(now.AddMinutes(-5), now);
+        Log.Write($"kept the last 5 minutes: {(clip == null ? "no video" : Path.GetFileName(clip))}");
+        tray.ShowBalloonTip(8000, clip == null ? "No video from the last 5 minutes" : "Kept the last 5 minutes",
+            clip == null
+                ? "The underwater cam wasn't recording (paused, a game, or night)."
+                : $"Saved as {Path.GetRelativePath(configDir, clip)}. Opening the rewind window a minute back.",
+            ToolTipIcon.None);
+        if (clip != null) OpenRewind(now.AddMinutes(-1));
     }
 
     private void OpenReview()

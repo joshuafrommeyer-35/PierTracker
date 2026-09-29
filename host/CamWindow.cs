@@ -78,7 +78,9 @@ internal sealed class CamWindow : Form
           if (!v) return 'novideo';
           if (v.error) return 'error';
           if (v.paused) return 'paused';
-          return 'playing:' + v.currentTime.toFixed(2);
+          // How far ahead the player has downloaded: when the next piece of the stream will be on screen.
+          const ahead = v.buffered.length ? v.buffered.end(v.buffered.length - 1) - v.currentTime : -1;
+          return 'playing:' + v.currentTime.toFixed(2) + ':' + ahead.toFixed(2);
         })()
         """;
 
@@ -170,12 +172,16 @@ internal sealed class CamWindow : Form
     private readonly string? captureDir;
     private readonly string lastStillPath; // the picture shown while suspended, kept across restarts
     private readonly WebView2 web;
+    private readonly System.Windows.Forms.Timer captureTimer = new();
+    private readonly RewindRecorder? recorder;
     private CoreWebView2Frame? camFrame;
+    private bool capturing;
+    private double bufferedAhead;       // seconds of video the player has downloaded beyond what's on screen
+    private DateTime? bufferedAheadAt;  // when that was measured (local time)
 
     private double lastVideoTime = -1;
     private DateTime lastAdvance = DateTime.UtcNow;
     private DateTime lastReload = DateTime.UtcNow;
-    private DateTime lastCapture = DateTime.MinValue;
     private bool wantedPlaying;
     private bool displayFrozen;
     private DateTime liveSince = DateTime.UtcNow;
@@ -189,13 +195,22 @@ internal sealed class CamWindow : Form
     public bool Suspended => suspended;
     /// <summary>False once Explorer has thrown away the wallpaper layer this window lived in (e.g. it crashed).</summary>
     public bool OnDesktop => IsHandleCreated && Native.HasParentWindow(Handle);
+    /// <summary>This cam's kept video, if it's set to keep it (livecams.json "rewind").</summary>
+    public VideoStore? Video => recorder?.Store;
 
     public CamWindow(CamConfig cam, Rectangle monitor, string configDir)
     {
         this.cam = cam;
         this.monitor = monitor;
         if (cam.CaptureEverySeconds > 0 && !string.IsNullOrWhiteSpace(cam.CaptureDir))
+        {
             captureDir = Path.GetFullPath(Path.Combine(configDir, cam.CaptureDir));
+            // Its own timer: the app's tick (every 3 s) is too slow for a frame every 2 s.
+            captureTimer.Interval = cam.CaptureEverySeconds * 1000;
+            captureTimer.Tick += async (_, _) => await CaptureTickAsync();
+        }
+        if (cam.Rewind != null)
+            recorder = new RewindRecorder(cam.Rewind, configDir, captureDir, NextPieceOnScreen);
         lastStillPath = Path.Combine(configDir, "frames", "stills", $"suspended-monitor{cam.Monitor}.jpg");
 
         Text = $"LiveCams - {cam.Name}";
@@ -250,12 +265,25 @@ internal sealed class CamWindow : Form
         {
             if (!e.IsSuccess) Log.Write($"[{cam.Name}] navigation failed: {e.WebErrorStatus}");
         };
+        recorder?.Attach(core);
 
         string script = IsolationScriptTemplate
             .Replace("__SELECTOR__", JsonSerializer.Serialize(cam.Iframe))
             .Replace("__EXTRA__", cam.ExtraBottomPx.ToString(CultureInfo.InvariantCulture));
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         core.Navigate(cam.Page);
+        if (captureDir != null) captureTimer.Start();
+    }
+
+    /// <summary>When the next piece of video the player downloads will be on screen, or null if unknown.</summary>
+    private DateTime? NextPieceOnScreen() =>
+        bufferedAheadAt is { } at && DateTime.Now - at < TimeSpan.FromSeconds(10) ? at.AddSeconds(bufferedAhead) : null;
+
+    /// <summary>The stream is starting over (reload, wake, suspend): what the player had buffered no longer counts.</summary>
+    private void StreamRestarted()
+    {
+        bufferedAheadAt = null;
+        recorder?.Break();
     }
 
     private void OnFrameCreated(object? sender, CoreWebView2FrameCreatedEventArgs e)
@@ -295,12 +323,20 @@ internal sealed class CamWindow : Form
             Log.Write($"[{cam.Name}] {StatusKind(Status)} -> {StatusKind(status)} (watched={watched})");
         Status = status;
 
-        if (status.StartsWith("playing:", StringComparison.Ordinal)
-            && double.TryParse(status.AsSpan(8), NumberStyles.Float, CultureInfo.InvariantCulture, out double t)
-            && t != lastVideoTime)
+        if (status.StartsWith("playing:", StringComparison.Ordinal))
         {
-            lastVideoTime = t;
-            lastAdvance = now;
+            string[] parts = status[8..].Split(':'); // current time : seconds buffered ahead
+            if (double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double t) && t != lastVideoTime)
+            {
+                lastVideoTime = t;
+                lastAdvance = now;
+            }
+            if (parts.Length > 1 && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double ahead)
+                && ahead >= 0)
+            {
+                bufferedAhead = ahead;
+                bufferedAheadAt = DateTime.Now;
+            }
         }
         bool advancing = now - lastAdvance < TimeSpan.FromSeconds(15);
 
@@ -328,12 +364,15 @@ internal sealed class CamWindow : Form
             displayFrozen = await RunInPlayerAsync(FreezeScript) == "frozen";
             if (displayFrozen) Log.Write($"[{cam.Name}] display frozen (stream keeps running)");
         }
+    }
 
-        if (captureDir != null && advancing && now - lastCapture >= CaptureInterval())
-        {
-            lastCapture = now;
-            await CaptureAsync();
-        }
+    /// <summary>A frame for the animal tracker every captureEverySeconds, while the video advances.</summary>
+    private async Task CaptureTickAsync()
+    {
+        if (capturing || suspended || camFrame == null || DateTime.UtcNow - lastAdvance > TimeSpan.FromSeconds(15)) return;
+        capturing = true;
+        try { await CaptureAsync(); }
+        finally { capturing = false; }
     }
 
     /// <summary>The user asked for this cam (desktop click or tray): resume it, or reload it if the player is broken.</summary>
@@ -389,6 +428,7 @@ internal sealed class CamWindow : Form
         suspended = true;
         suspendedStill = still;
         camFrame = null;
+        StreamRestarted();
         string img = still == null ? "" :
             $"<img src='data:image/jpeg;base64,{Convert.ToBase64String(still)}' " +
             "style='width:100vw;height:100vh;object-fit:cover;display:block'>";
@@ -408,6 +448,7 @@ internal sealed class CamWindow : Form
         suspended = false;
         lastReload = lastAdvance = liveSince = DateTime.UtcNow;
         displayFrozen = false;
+        StreamRestarted();
         web.CoreWebView2?.Navigate(cam.Page);
         Log.Write($"[{cam.Name}] woke");
     }
@@ -442,27 +483,8 @@ internal sealed class CamWindow : Form
         lastReload = lastAdvance = liveSince = DateTime.UtcNow;
         displayFrozen = false; // a reloaded page has no freeze overlay
         camFrame = null;
+        StreamRestarted();
         web.CoreWebView2?.Reload();
-    }
-
-    /// <summary>
-    /// Normally captureEverySeconds; every tick (~3 s) while the tracker is following a fish it
-    /// could name. The tracker asks by writing a Unix time to burst_until in the capture folder.
-    /// </summary>
-    private TimeSpan CaptureInterval()
-    {
-        try
-        {
-            string flag = Path.Combine(captureDir!, "burst_until");
-            if (File.Exists(flag) && long.TryParse(File.ReadAllText(flag).Trim(), out long until)
-                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() < until)
-                return TimeSpan.Zero;
-        }
-        catch (IOException)
-        {
-            // the tracker is writing it right now; try again next tick
-        }
-        return TimeSpan.FromSeconds(cam.CaptureEverySeconds);
     }
 
     private async Task CaptureAsync()
@@ -488,6 +510,12 @@ internal sealed class CamWindow : Form
 
     private static string StatusKind(string status) =>
         status.StartsWith("playing:", StringComparison.Ordinal) ? "playing" : status;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) captureTimer.Dispose();
+        base.Dispose(disposing);
+    }
 
     protected override CreateParams CreateParams
     {

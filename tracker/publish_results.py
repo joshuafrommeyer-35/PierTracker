@@ -38,7 +38,8 @@ CLASSIFIER_REPORT = ROOT / "data" / "ml" / "classifier_report.md"
 README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
-SNAPSHOT_SECONDS = 10  # LiveCams saves a frame this often (captureEverySeconds)
+SNAPSHOT_SECONDS = 10  # one snapshot this often (the frames LiveCams saves in between, every 2 s, aren't snapshots)
+CAMERA_CLASSIFIER_MIN = 12  # answers an animal needs before the camera-trained classifier learns it (ml/train_classifier.py)
 # Sightings of the same animal closer together than this are one encounter: the usual camera-trap
 # rule for "independent detections" (results were found stable between 5 and 60 minutes).
 ENCOUNTER_GAP = timedelta(minutes=30)
@@ -178,6 +179,34 @@ def read_reviews():
     return confirmed, rejected, checks
 
 
+def training_answers():
+    """{animal: answers} from the review window. Every answer, a person's or Claude's, is a training
+    example for the camera-trained classifier ("not an animal" is a class too)."""
+    counts = defaultdict(int)
+    if DECISIONS_CSV.exists():
+        with DECISIONS_CSV.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                counts[r["common_name"] if r["decision"] == "approved" and r["common_name"] else "not an animal"] += 1
+    return counts
+
+
+def training_line(counts):
+    total = sum(counts.values())
+    animals = {n: c for n, c in counts.items() if n != "not an animal"}
+    ready = sorted(n for n, c in animals.items() if c >= CAMERA_CLASSIFIER_MIN)
+    if ready:
+        progress = (f"So far {len(ready)} {'has' if len(ready) == 1 else 'have'} enough ({', '.join(ready)}), "
+                    f"from {total:,} answers.")
+    elif animals:
+        closest = max(animals, key=animals.get)
+        progress = f"None has enough yet: {total:,} answers so far, and {closest} is closest with {animals[closest]}."
+    else:
+        progress = "There are no answers yet."
+    return (f"Names come from BioCLIP 2.5, a general model of living things. A classifier trained on this "
+            f"camera's own pictures takes over each animal once it has {CAMERA_CLASSIFIER_MIN}+ review answers "
+            f"(retrained nightly, and used only where it beats BioCLIP). {progress}")
+
+
 def build(effort, species):
     days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "murky": 0, "species": defaultdict(lambda: [0, 0])})
     for (d, _), (analyzed, dark, murky) in effort.items():
@@ -291,7 +320,7 @@ def write_daily_conditions(rows):
 
 
 def render_conditions(rows):
-    """Kept short on purpose: one headline, one chart, and the table folded away."""
+    """Kept short on purpose: one headline, with the chart and the table folded away."""
     if not rows:
         return []
 
@@ -306,7 +335,7 @@ def render_conditions(rows):
              f"**{latest['date']}:** water {fmt(latest['water_temp_c'])} °C at ~5 m, "
              f"**{fmt(latest['water_temp_anomaly_c'], signed=True)} °C** vs. normal for the date. Turbidity "
              f"{fmt(latest['turbidity_ntu_daytime'], 2)} NTU, chlorophyll {fmt(latest['chlorophyll_ug_l'], 2)} µg/L."
-             + enso, ""]
+             + enso, "", "<details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>", ""]
     chart = [r for r in rows if r["water_temp_c"] is not None][-30:]
     if len(chart) >= 2 and all(r["water_temp_normal_c"] is not None for r in chart):
         lo = min(min(r["water_temp_c"], r["water_temp_normal_c"]) for r in chart)
@@ -319,8 +348,7 @@ def render_conditions(rows):
                   "    line [" + ", ".join(str(r["water_temp_normal_c"]) for r in chart) + "]",
                   "```", "",
                   "_Upper line: this year. Lower line: the 2013–2025 normal for each date._", ""]
-    lines += ["<details><summary>Daily conditions, last 14 days</summary>", "",
-              "| Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |",
+    lines += ["| Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |",
               "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for r in rows[-14:]:
         lines.append(f"| {r['date']} | {fmt(r['water_temp_c'])} | {fmt(r['water_temp_anomaly_c'], signed=True)} | "
@@ -403,22 +431,18 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "",
         "### Animals seen",
         "",
-        "The tracker can't tell individual fish apart, so none of these numbers count individuals:",
-        "- **Encounters**: sightings of the same animal less than 30 minutes apart are one encounter (the",
-        "  usual camera-trap rule for independent detections). A kelp bass that hangs around the camera for",
-        "  an hour is one encounter. Two encounters can still be the same fish coming back.",
-        "- **Snapshots**: how many snapshots (one every 10 s) it was in, i.e. how long it was around.",
-        "- **Most at once (MaxN)**: the most seen in a single snapshot, the standard count for underwater",
-        "  video because no fish can be counted twice. It undercounts big schools.",
+        "- **Most at once (MaxN)**: the most of that animal in one frame, i.e. how many were certainly there.",
+        "  It's the standard head count for underwater cameras: a fish that swims out and back can't be",
+        "  counted twice. (What no camera count can do is recognize a particular fish, e.g. whether today's",
+        "  kelp bass is yesterday's.) For schools of small fish it's a rough, rounded estimate.",
+        "- **Encounters**: separate visits. Sightings less than 30 minutes apart are one encounter, the usual",
+        "  camera-trap rule, so a kelp bass that stays for an hour is one encounter.",
+        f"- **Snapshots**: how many snapshots (one every {SNAPSHOT_SECONDS} s) it was in, i.e. how long it was around.",
+        "  The frames in between (every 2 s) catch animals that pass quickly: those count as encounters.",
         "",
-        "Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish",
-        "(too small to name) the count is a rough estimate from the moving specks, rounded.",
-        "",
-        "Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many",
-        "of its names a person has looked at so far, and how many were right. Listed here: animals a person",
-        f"has confirmed, or seen repeatedly ({LIST_MIN_SNAPSHOTS}+ snapshots or {LIST_MIN_ENCOUNTERS}+ separate encounters). "
-        "Brief one-off guesses are listed separately below the table. Sightings found to be wrong by checking",
-        "the pictures are corrected (a lobster's antenna is not a stingray).",
+        training_line(training_answers()) + " **Checked**: how many of the names a person has checked, and how "
+        f"many were right. Listed: animals a person confirmed or seen repeatedly ({LIST_MIN_SNAPSHOTS}+ snapshots or "
+        f"{LIST_MIN_ENCOUNTERS}+ encounters). Sightings found wrong by checking the pictures are corrected.",
         "",
         "| Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |",
         "|---|---|---:|---:|---:|---:|---:|---|---|---|",
@@ -439,8 +463,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         lines += ["", f"<details><summary>Seen briefly and not yet checked: {len(minor)} more names</summary>", "",
                   "The model's guesses for things it saw only briefly. Until a person confirms one, treat these as",
                   "unverified: many will turn out to be a better-known fish seen at an odd angle.", "",
-                  "| Animal | Snapshots | First seen | Last seen |", "|---|---:|---|---|"]
-        lines += [f"| {name} | {t['seen']:,} | {t['first']} | {t['last']} |" for name, t in minor]
+                  "| Animal | Encounters | Snapshots | First seen | Last seen |", "|---|---:|---:|---|---|"]
+        lines += [f"| {name} | {t['encounters']:,} | {t['seen']:,} | {t['first']} | {t['last']} |" for name, t in minor]
         lines += ["", "</details>"]
 
     recent = [(date.fromisoformat(last) - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
@@ -448,7 +472,9 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
     per_day = [sum(s for s, _ in days[d]["species"].values()) if d in days else 0 for d in recent]
     lines += [
         "",
-        "### Sightings per day (up to the last 14 days)",
+        "<details><summary>Charts: sightings per day, and by hour of day</summary>",
+        "",
+        "#### Sightings per day (up to the last 14 days)",
         "",
         "```mermaid",
         "xychart-beta",
@@ -457,7 +483,7 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "    bar [" + ", ".join(str(v) for v in per_day) + "]",
         "```",
         "",
-        "### When animals show up (all days, Pacific time)",
+        "#### When animals show up (all days, Pacific time)",
         "",
         "```mermaid",
         "xychart-beta",
@@ -466,9 +492,11 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "    bar [" + ", ".join(str(v) for v in by_hour_of_day) + "]",
         "```",
         "",
+        "</details>",
+        "",
         "Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: "
-        "[what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the "
-        "[camera-trained classifier](results/camera_classifier.md) (trained from the review answers) and the "
+        "[what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data), the "
+        "[camera-trained classifier](results/camera_classifier.md) and the "
         "[reference-photo classifier](results/reference_probe.md) (in shadow mode until it beats the names on review answers).",
     ]
     return "\n".join(lines + render_conditions(conditions) + render_confirmed(confirmed, rejected)

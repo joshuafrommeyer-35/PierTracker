@@ -6,7 +6,9 @@ public repo; this is the place to explore.
 
 Tables (see SCHEMA below for every column):
   species     the animals the tracker knows (from species.json), with their look-alike group
-  snapshots   every frame the tracker analyzed: one row per ~10 s while the cam streams
+  snapshots   every frame the tracker analyzed: one row per ~10 s while the cam streams (regular = 1),
+              plus the frames in between where it found something (regular = 0). Rates and "how long
+              around" use only regular = 1, so they mean the same as when tracking began.
   sightings   what was in a snapshot: one row per animal type per snapshot
   conditions  hourly conditions at the pier (tide, temperatures, El Nino index, ...)
   reviews     answers given in the review window
@@ -52,7 +54,9 @@ CREATE TABLE IF NOT EXISTS snapshots (
     hour      INTEGER NOT NULL,  -- 0-23
     dark       INTEGER NOT NULL,  -- 1 = night frame: counted, but no model ran
     murky      INTEGER NOT NULL DEFAULT 0,  -- 1 = water too murky to identify anything: no model ran
-    visibility REAL               -- how much detail the frame shows (higher = clearer water)
+    visibility REAL,              -- how much detail the frame shows (higher = clearer water)
+    regular    INTEGER NOT NULL DEFAULT 1   -- 1 = a snapshot (one every ~10 s); 0 = a frame in between
+                                            -- where something new passed (recorded only with sightings)
 );
 
 CREATE TABLE IF NOT EXISTS sightings (
@@ -72,7 +76,7 @@ CREATE TABLE IF NOT EXISTS visits (
     id          INTEGER PRIMARY KEY,
     started_at  TEXT,     -- first frame the fish was seen in
     ended_at    TEXT,     -- last frame
-    looks       INTEGER,  -- frames it was seen in (regular + burst)
+    looks       INTEGER,  -- frames it was seen in (snapshots + frames in between)
     common_name TEXT,     -- named from the average of all looks
     confidence  REAL
 );
@@ -112,7 +116,8 @@ def connect(path: Path = None) -> sqlite3.Connection:
 
 def migrate(con: sqlite3.Connection):
     """Columns added after a database was first made."""
-    for table, column in (("sightings", "corrected_name TEXT"), ("reviews", "reviewer TEXT")):
+    for table, column in (("sightings", "corrected_name TEXT"), ("reviews", "reviewer TEXT"),
+                          ("snapshots", "regular INTEGER NOT NULL DEFAULT 1")):
         if column.split()[0] not in [c[1] for c in con.execute(f"PRAGMA table_info({table})")]:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
     con.commit()
@@ -146,12 +151,15 @@ def apply_corrections(con: sqlite3.Connection, corrections: Path = None):
     return fixed
 
 
-def record_snapshot(con: sqlite3.Connection, taken_at: str, dark: bool, sightings, murky=False, visibility=None):
-    """Called by the tracker for every analyzed frame."""
+def record_snapshot(con: sqlite3.Connection, taken_at: str, dark: bool, sightings, murky=False, visibility=None,
+                    regular=True):
+    """Called by the tracker for every snapshot, and for a frame in between where it found something
+    (regular=False)."""
     date, time = taken_at.split("T")
-    con.execute("INSERT OR IGNORE INTO snapshots VALUES (?, ?, ?, ?, ?, ?)",
+    con.execute("INSERT OR IGNORE INTO snapshots (taken_at, date, hour, dark, murky, visibility, regular) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (taken_at, date, int(time[:2]), int(dark), int(murky),
-                 None if visibility is None else round(visibility, 3)))
+                 None if visibility is None else round(visibility, 3), int(regular)))
     con.executemany(
         "INSERT INTO sightings (taken_at, common_name, is_school, count, confidence, method) VALUES (?, ?, ?, ?, ?, ?)",
         [(taken_at, s.common.removesuffix(" (school)"), int(s.common.endswith(" (school)")), s.count,
@@ -197,14 +205,18 @@ def sync(con: sqlite3.Connection):
 def hourly(con: sqlite3.Connection):
     """The hourly summary: one row per (date, hour, animal), with that hour's effort (snapshots
     analyzed, dark, murky) and the animal's snapshots and most at once. An hour with no sightings
-    gets one row with a blank animal. Schools are named "<animal> (school)"."""
+    gets one row with a blank animal. Schools are named "<animal> (school)".
+
+    Effort and snapshots_seen count snapshots only (one every ~10 s). max_count also looks at the
+    frames in between, so an animal seen only between two snapshots has a row with snapshots_seen 0."""
     effort = {(d, h): (n, dark, murky) for d, h, n, dark, murky in con.execute(
-        "SELECT date, hour, COUNT(*), SUM(dark), SUM(murky) FROM snapshots WHERE taken_at >= ? "
+        "SELECT date, hour, COUNT(*), SUM(dark), SUM(murky) FROM snapshots WHERE taken_at >= ? AND regular = 1 "
         "GROUP BY date, hour", (STATS_FROM,))}
     seen = {}
     for d, h, name, n, most in con.execute(
             "SELECT p.date, p.hour, COALESCE(g.corrected_name, g.common_name) "
-            "|| CASE WHEN g.is_school THEN ' (school)' ELSE '' END, COUNT(DISTINCT g.taken_at), MAX(g.count) "
+            "|| CASE WHEN g.is_school THEN ' (school)' ELSE '' END, "
+            "COUNT(DISTINCT CASE WHEN p.regular = 1 THEN g.taken_at END), MAX(g.count) "
             "FROM sightings g JOIN snapshots p ON p.taken_at = g.taken_at "
             "WHERE p.taken_at >= ? AND COALESCE(g.corrected_name, g.common_name) <> '' GROUP BY 1, 2, 3",
             (STATS_FROM,)):
@@ -234,7 +246,7 @@ def backfill_sightings(con: sqlite3.Connection):
     with path.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     for r in rows:
-        con.execute("INSERT OR IGNORE INTO snapshots VALUES (?, ?, ?, 0, 0, NULL)",
+        con.execute("INSERT OR IGNORE INTO snapshots (taken_at, date, hour, dark, murky) VALUES (?, ?, ?, 0, 0)",
                     (r["timestamp"], r["date"], int(r["time"][:2])))
         name = r["common_name"]
         con.execute("INSERT INTO sightings (taken_at, common_name, is_school, count, confidence, method) "

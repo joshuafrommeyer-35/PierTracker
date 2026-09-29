@@ -18,8 +18,11 @@
       "extraBottomPx": 0,
       "mode": "alwaysOn",                // the stream never stops, so the animal logger always has frames
       "freezeDisplayAfterSeconds": 300,  // your screen freezes after 5 min; click the desktop there to go live again
-      "captureEverySeconds": 10,      // frames for the animal logger
-      "captureDir": "frames/underwater"
+      "captureEverySeconds": 2,       // frames for the animal logger (its statistics use one every ~10 s)
+      "captureDir": "frames/underwater",
+      // Keep the video itself for rewinding (tray: "Rewind the underwater cam"): ~2.1 GB an hour of
+      // daylight, oldest deleted first. 50 GB is about 24 hours, i.e. the last two days' daylight.
+      "rewind": { "dir": "video", "maxGB": 50, "minFreeGB": 50 }
     }
   ],
   // "Looking" = the monitor isn't mostly covered by a window AND there was input in the last N seconds.

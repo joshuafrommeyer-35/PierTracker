@@ -27,6 +27,9 @@ def test_old_database_gets_new_columns(tmp_path):
     path = tmp_path / "old.db"
     with closing(sqlite3.connect(path)) as c:
         c.executescript("""
+            CREATE TABLE snapshots (taken_at TEXT PRIMARY KEY, date TEXT NOT NULL, hour INTEGER NOT NULL,
+                                    dark INTEGER NOT NULL, murky INTEGER NOT NULL DEFAULT 0, visibility REAL);
+            INSERT INTO snapshots VALUES ('2026-09-25T10:00:00', '2026-09-25', 10, 0, 0, 2.5);
             CREATE TABLE sightings (id INTEGER PRIMARY KEY, taken_at TEXT NOT NULL, common_name TEXT NOT NULL,
                                     is_school INTEGER NOT NULL DEFAULT 0, count INTEGER NOT NULL, confidence REAL, method TEXT);
             CREATE TABLE reviews (reviewed_at TEXT, taken_at TEXT, image TEXT PRIMARY KEY, kind TEXT, logged_as TEXT,
@@ -34,6 +37,20 @@ def test_old_database_gets_new_columns(tmp_path):
     with closing(db.connect(path)) as c:
         assert "corrected_name" in [r[1] for r in c.execute("PRAGMA table_info(sightings)")]
         assert "reviewer" in [r[1] for r in c.execute("PRAGMA table_info(reviews)")]
+        assert c.execute("SELECT regular FROM snapshots").fetchone()[0] == 1  # everything before was a snapshot
+        db.record_snapshot(c, "2026-09-25T10:00:10", False, [])  # and recording still works on the old table
+
+
+def test_frames_between_snapshots_count_for_most_at_once_not_for_snapshots(con):
+    db.record_snapshot(con, "2026-09-25T10:00:00", False, [Sighting("kelp bass")])
+    db.record_snapshot(con, "2026-09-25T10:00:04", False, [Sighting("octopus"), Sighting("kelp bass", 2)], regular=False)
+    db.record_snapshot(con, "2026-09-25T10:00:10", False, [])
+    rows = {(r["hour"], r["common_name"]): r for r in db.hourly(con)}
+    assert rows[(10, "kelp bass")]["snapshots_analyzed"] == 2  # effort: one snapshot every ~10 s, as always
+    assert rows[(10, "kelp bass")]["snapshots_seen"] == 1
+    assert rows[(10, "kelp bass")]["max_count"] == 2           # two at once, between the snapshots
+    assert rows[(10, "octopus")]["snapshots_seen"] == 0 and rows[(10, "octopus")]["max_count"] == 1
+    assert "octopus" in {name for _, name in db.sighting_times(con)}  # so it counts as an encounter
 
 
 def test_hourly_summary_counts_snapshots_and_schools(con):

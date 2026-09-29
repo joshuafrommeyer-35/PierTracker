@@ -3,9 +3,11 @@ app/
 host/bin/
 host/obj/
 host/webview-data/
+host/webview-viewer/
 
 # Runtime files (frames, logs, raw per-snapshot data and crops stay local)
 frames/
+video/
 logs/
 data/
 sandbox/

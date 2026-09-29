@@ -18,4 +18,9 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The rewind window's page and its player (hls.js 1.7.3, Apache-2.0: viewer/hls.js.LICENSE). -->
+    <None Update="viewer\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Underwater cam · rewind</title>
+<style>
+  :root { color-scheme: dark; --bg: #0f1318; --panel: #1a2029; --line: #2c3541; --text: #e6e9ed; --dim: #8b95a1;
+          --accent: #3fa7d6; --keep: #f0a830; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px "Segoe UI", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 10px 16px 6px; }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  #range { color: var(--dim); }
+  #stage { flex: 1; min-height: 0; position: relative; background: #000; }
+  video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #clock { position: absolute; left: 16px; top: 12px; font: 600 26px/1.1 "Segoe UI", sans-serif;
+           text-shadow: 0 1px 6px #000; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #clock small { display: block; font-size: 14px; font-weight: 400; color: #cfd6de; }
+  #toast { position: absolute; right: 16px; top: 12px; max-width: 60%; background: rgba(10, 14, 18, .85);
+           border: 1px solid var(--line); padding: 8px 12px; border-radius: 8px; display: none; }
+  #empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: var(--dim);
+           text-align: center; padding: 40px; line-height: 1.6; }
+  #timeline { position: relative; height: 46px; margin: 10px 16px 0; user-select: none; }
+  #bar { position: absolute; left: 0; right: 0; top: 8px; height: 16px; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 8px; cursor: pointer; overflow: hidden; }
+  #buffered { position: absolute; top: 0; bottom: 0; background: rgba(63, 167, 214, .18); }
+  .gap { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--bg); }
+  #head { position: absolute; top: 2px; width: 3px; height: 28px; margin-left: -1px; background: var(--accent);
+          border-radius: 2px; pointer-events: none; }
+  .tick { position: absolute; top: 28px; font-size: 11px; color: var(--dim); transform: translateX(-50%); white-space: nowrap; }
+  .tick.day { color: var(--text); font-weight: 600; }
+  #hover { position: absolute; top: -16px; font-size: 12px; background: var(--panel); border: 1px solid var(--line);
+           padding: 1px 6px; border-radius: 4px; transform: translateX(-50%); display: none; pointer-events: none; white-space: nowrap; }
+  #controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px 14px; }
+  button, select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+                          padding: 6px 10px; font: inherit; }
+  button { cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #001018; border-color: var(--accent); font-weight: 600; min-width: 70px; }
+  button.keep { border-color: var(--keep); color: var(--keep); }
+  .sep { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+  .help { color: var(--dim); font-size: 12px; margin-left: auto; }
+  label { color: var(--dim); }
+</style>
+</head>
+<body>
+<header><h1>Underwater cam · rewind</h1><span id="range">Loading...</span></header>
+<div id="stage">
+  <video id="video" muted playsinline></video>
+  <div id="clock"></div>
+  <div id="toast"></div>
+  <div id="empty">No video kept yet.<br>LiveCams keeps the underwater cam's video while it streams in daylight;<br>it shows up here within a minute.</div>
+</div>
+<div id="timeline"><div id="bar"><div id="buffered"></div></div><div id="head"></div><div id="hover"></div></div>
+<div id="controls">
+  <button id="back60" title="Back 1 minute (Shift+Left)">&laquo; 1 min</button>
+  <button id="back10" title="Back 10 seconds (Left)">&lsaquo; 10 s</button>
+  <button id="play" class="primary" title="Play or pause (Space)">Play</button>
+  <button id="fwd10" title="Forward 10 seconds (Right)">10 s &rsaquo;</button>
+  <button id="fwd60" title="Forward 1 minute (Shift+Right)">1 min &raquo;</button>
+  <button id="frame" title="One frame forward (.), or back (,)">Frame &rsaquo;</button>
+  <select id="speed" title="Speed ([ and ])">
+    <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option>
+    <option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option>
+  </select>
+  <span class="sep"></span>
+  <label>Go to <select id="day"></select> <input id="time" type="time" step="1" title="A clock time, e.g. 17:52"></label>
+  <button id="latest" title="The most recent video">Latest</button>
+  <span class="sep"></span>
+  <button id="keep" class="keep" title="Keep 2 minutes before and 1 minute after this moment. Kept clips are never deleted.">Keep this moment</button>
+  <button id="still" title="Save the frame on screen as a picture">Save picture</button>
+  <button id="saved" title="Open the folder with kept clips and pictures">Saved...</button>
+  <span class="help">Space play/pause · &larr; &rarr; 10 s · Shift 1 min · , . frame · [ ] speed</span>
+</div>
+<script src="hls.min.js"></script>
+<script src="rewind.js"></script>
+</body>
+</html>

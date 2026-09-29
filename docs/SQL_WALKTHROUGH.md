@@ -170,18 +170,20 @@ GROUP BY g.common_name HAVING n >= 10 ORDER BY avg_anomaly DESC;
 morning was murky. To compare fairly, divide by **effort**: the clear-water snapshots in that hour. This
 is the step people most often skip.
 
-`WITH` names an intermediate result (a CTE), so a long query reads in steps:
+`WITH` names an intermediate result (a CTE), so a long query reads in steps. `regular = 1` keeps only
+the snapshots (one every ~10 s): since 2026-09-28 the tracker also records frames *between* snapshots
+where something passed quickly (`regular = 0`), and those would count the same fish again.
 
 ```sql
 WITH effort AS (
     SELECT hour, COUNT(*) AS clear_snapshots
-    FROM snapshots WHERE dark = 0 AND murky = 0
+    FROM snapshots WHERE dark = 0 AND murky = 0 AND regular = 1
     GROUP BY hour
 ),
 schools AS (
     SELECT p.hour, COUNT(*) AS with_school
     FROM sightings g JOIN snapshots p ON p.taken_at = g.taken_at
-    WHERE g.common_name = 'small fish' AND g.is_school = 1
+    WHERE g.common_name = 'small fish' AND g.is_school = 1 AND p.regular = 1
     GROUP BY p.hour
 )
 SELECT e.hour, e.clear_snapshots, COALESCE(s.with_school, 0) AS with_school,

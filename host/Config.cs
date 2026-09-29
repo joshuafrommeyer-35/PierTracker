@@ -37,7 +37,25 @@ internal sealed class CamConfig
     /// <summary>Folder for captured frames, relative to the config file.</summary>
     public string? CaptureDir { get; set; }
 
+    /// <summary>Keep this cam's video so it can be rewound (see <see cref="RewindRecorder"/>). Null = off.</summary>
+    public RewindConfig? Rewind { get; set; }
+
     public bool ResumeWhenWatched => Mode.Equals("resumeWhenWatched", StringComparison.OrdinalIgnoreCase);
+}
+
+internal sealed class RewindConfig
+{
+    /// <summary>Folder, relative to the config file: the video in rewind/, kept clips and pictures in saved/.</summary>
+    public string Dir { get; set; } = "video";
+
+    /// <summary>The oldest video is deleted beyond this much (GB). The underwater stream is ~2.1 GB an hour.</summary>
+    public double MaxGB { get; set; } = 50;
+
+    /// <summary>...and before the drive's free space would drop below this (GB).</summary>
+    public double MinFreeGB { get; set; } = 50;
+
+    /// <summary>Don't keep video while the tracker says it's night (the camera sees only noise).</summary>
+    public bool SkipDark { get; set; } = true;
 }
 
 internal sealed class AppConfig

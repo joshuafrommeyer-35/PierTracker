@@ -1,7 +1,13 @@
 taken_at,kind,tracker_logged_as,decision,answer,tracker_best_guess,tracker_best_guess_prob,reviewer
+2026-09-25T09:06:08,check,blacksmith,approved,blacksmith,blacksmith,0.998,person
+2026-09-25T09:32:45,check,sargo,approved,California spiny lobster,sargo,0.796,person
 2026-09-25T09:33:45,uncertain,,rejected,,sheep crab,0.568,claude
 2026-09-25T09:34:09,uncertain,,approved,California spiny lobster,California spiny lobster,0.882,claude
+2026-09-25T10:03:17,check,blacksmith,approved,blacksmith,blacksmith,0.994,person
+2026-09-25T10:06:05,check,barred sand bass,approved,barred sand bass,barred sand bass,0.981,person
+2026-09-25T10:06:17,uncertain,,approved,blacksmith,salema,0.556,person
 2026-09-25T10:08:29,check,shovelnose guitarfish,rejected,,shovelnose guitarfish,0.965,claude
+2026-09-25T10:19:29,check,blacksmith,approved,blacksmith,blacksmith,0.876,person
 2026-09-25T10:19:29,uncertain,,rejected,,purple-striped jellyfish,0.476,claude
 2026-09-25T10:39:24,uncertain,,rejected,,black sea nettle jellyfish,0.448,claude
 2026-09-25T10:40:22,uncertain,,rejected,,leopard shark,0.504,claude
@@ -11,10 +17,20 @@ taken_at,kind,tracker_logged_as,decision,answer,tracker_best_guess,tracker_best_
 2026-09-25T10:45:19,uncertain,,rejected,,sheep crab,0.561,claude
 2026-09-25T10:50:10,uncertain,,rejected,,sheep crab,0.528,claude
 2026-09-25T10:53:40,uncertain,,rejected,,octopus,0.683,claude
+2026-09-25T10:57:28,uncertain,,approved,salema,salema,0.754,person
+2026-09-25T10:58:52,check,jacksmelt,approved,jacksmelt,jacksmelt,0.933,person
+2026-09-25T10:58:52,check,salema,approved,salema,salema,0.986,person
+2026-09-25T11:07:21,uncertain,,approved,blacksmith,blacksmith,0.570,person
 2026-09-25T11:07:54,check,green sea turtle,rejected,,green sea turtle,1.000,claude
+2026-09-25T11:08:15,uncertain,,approved,blacksmith,yellowtail amberjack,0.757,person
 2026-09-25T11:11:57,uncertain,,rejected,,sheep crab,0.770,claude
+2026-09-25T11:12:42,uncertain,,approved,blacksmith,salema,0.460,person
+2026-09-25T11:13:45,uncertain,,approved,blacksmith,queenfish,0.765,person
 2026-09-25T11:14:06,check,sheep crab,rejected,,sheep crab,0.905,claude
+2026-09-25T11:16:30,check,bullseye pufferfish,approved,blacksmith,bullseye pufferfish,0.983,person
+2026-09-25T11:29:11,uncertain,,approved,blacksmith,opaleye,0.523,person
 2026-09-25T11:30:35,check,green sea turtle,rejected,,green sea turtle,0.968,claude
+2026-09-25T11:30:59,uncertain,,approved,blacksmith,queenfish,0.799,person
 2026-09-25T11:35:29,uncertain,,rejected,,octopus,0.522,claude
 2026-09-25T11:36:38,uncertain,,rejected,,leopard shark,0.578,claude
 2026-09-25T11:48:51,check,green sea turtle,rejected,,green sea turtle,1.000,claude

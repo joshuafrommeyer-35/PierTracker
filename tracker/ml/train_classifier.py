@@ -46,9 +46,10 @@ def current_embedding_model():
 
 def examples():
     """(embeddings, labels, zero-shot guesses) for every answered picture with a stored embedding
-    from the current model."""
+    from the current model. The earliest pictures don't say which model made their embedding; those
+    count only if it's as long as the current model's (BioCLIP 2's were 768 numbers, 2.5's are 1,024)."""
     model = current_embedding_model()
-    X, y, zero_shot = [], [], []
+    rows = []
     if not DECISIONS.exists():
         return np.zeros((0, 0)), [], []
     with DECISIONS.open(encoding="utf-8") as f:
@@ -58,12 +59,14 @@ def examples():
             if not item.exists():
                 continue
             data = json.loads(item.read_text(encoding="utf-8"))
-            if not data.get("embedding") or data.get("embedding_model", model) != model:
-                continue
-            X.append(data["embedding"])
-            y.append(row["common_name"] if row["decision"] == "approved" else NOT_AN_ANIMAL)
-            zero_shot.append(row["best_guess"])
-    return np.array(X, np.float32), y, zero_shot
+            if data.get("embedding") and data.get("embedding_model", model) == model:
+                rows.append((data["embedding"], row, "embedding_model" in data))
+    sizes = Counter(len(e) for e, _, tagged in rows if tagged) or Counter(len(e) for e, _, _ in rows)
+    size = sizes.most_common(1)[0][0] if sizes else 0
+    rows = [(e, row) for e, row, _ in rows if len(e) == size]
+    X = np.array([e for e, _ in rows], np.float32).reshape(-1, size)
+    y = [row["common_name"] if row["decision"] == "approved" else NOT_AN_ANIMAL for _, row in rows]
+    return X, y, [row["best_guess"] for _, row in rows]
 
 
 def status_lines(y):

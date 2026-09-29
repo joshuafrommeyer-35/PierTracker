@@ -58,20 +58,59 @@ date,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,encounters,sn
 2026-09-26,956,0,0,topsmelt,1,1,1
 2026-09-26,956,0,0,"wrasses (senorita, sheephead)",2,9,1
 2026-09-26,956,0,0,yellowtail amberjack,3,6,1
-2026-09-27,1377,630,0,California spiny lobster,1,59,1
-2026-09-27,1377,630,0,bat ray,1,3,1
-2026-09-27,1377,630,0,blacksmith,2,6,3
-2026-09-27,1377,630,0,diamond stingray,1,1,1
-2026-09-27,1377,630,0,fish (unidentified),,25,3
-2026-09-27,1377,630,0,fish (unidentified) (school),,2,5
-2026-09-27,1377,630,0,jack mackerel,1,1,1
-2026-09-27,1377,630,0,kelp bass,3,12,1
-2026-09-27,1377,630,0,octopus,3,6,1
-2026-09-27,1377,630,0,rays,2,2,1
-2026-09-27,1377,630,0,sea basses,1,22,1
-2026-09-27,1377,630,0,sharks,1,1,1
-2026-09-27,1377,630,0,sheep crab,1,1,1
-2026-09-27,1377,630,0,shovelnose guitarfish,1,1,1
-2026-09-27,1377,630,0,small fish (school),,87,350
-2026-09-27,1377,630,0,topsmelt,1,1,1
-2026-09-27,1377,630,0,"wrasses (senorita, sheephead)",2,2,1
+2026-09-27,1784,1037,0,California spiny lobster,1,59,1
+2026-09-27,1784,1037,0,bat ray,1,3,1
+2026-09-27,1784,1037,0,blacksmith,2,6,3
+2026-09-27,1784,1037,0,diamond stingray,1,1,1
+2026-09-27,1784,1037,0,fish (unidentified),,25,3
+2026-09-27,1784,1037,0,fish (unidentified) (school),,2,5
+2026-09-27,1784,1037,0,jack mackerel,1,1,1
+2026-09-27,1784,1037,0,kelp bass,3,12,1
+2026-09-27,1784,1037,0,rays,2,2,1
+2026-09-27,1784,1037,0,sea basses,1,22,1
+2026-09-27,1784,1037,0,sharks,1,1,1
+2026-09-27,1784,1037,0,sheep crab,1,1,1
+2026-09-27,1784,1037,0,shovelnose guitarfish,1,1,1
+2026-09-27,1784,1037,0,small fish (school),,87,350
+2026-09-27,1784,1037,0,topsmelt,1,1,1
+2026-09-27,1784,1037,0,"wrasses (senorita, sheephead)",2,2,1
+2026-09-28,5164,2243,0,California spiny lobster,6,211,1
+2026-09-28,5164,2243,0,Pacific sardine,4,14,1
+2026-09-28,5164,2243,0,bat ray,3,25,1
+2026-09-28,5164,2243,0,black sea nettle jellyfish,2,2,1
+2026-09-28,5164,2243,0,blacksmith,6,68,4
+2026-09-28,5164,2243,0,blacksmith (school),1,2,8
+2026-09-28,5164,2243,0,bullseye pufferfish,1,1,1
+2026-09-28,5164,2243,0,"damselfishes (garibaldi, blacksmith)",6,12,3
+2026-09-28,5164,2243,0,diamond stingray,8,11,1
+2026-09-28,5164,2243,0,fish (unidentified),,350,4
+2026-09-28,5164,2243,0,fish (unidentified) (school),,17,9
+2026-09-28,5164,2243,0,garibaldi,1,1,1
+2026-09-28,5164,2243,0,giant kelpfish,2,2,1
+2026-09-28,5164,2243,0,"grunts (salema, sargo)",4,7,1
+2026-09-28,5164,2243,0,jack mackerel,5,20,1
+2026-09-28,5164,2243,0,jacksmelt,3,4,1
+2026-09-28,5164,2243,0,jellyfish,1,2,1
+2026-09-28,5164,2243,0,kelp bass,3,31,1
+2026-09-28,5164,2243,0,leopard shark,1,1,1
+2026-09-28,5164,2243,0,mackerels & bonito,3,3,1
+2026-09-28,5164,2243,0,market squid,2,2,1
+2026-09-28,5164,2243,0,opaleye,1,1,1
+2026-09-28,5164,2243,0,pile perch,1,1,1
+2026-09-28,5164,2243,0,purple-striped jellyfish,1,1,1
+2026-09-28,5164,2243,0,queenfish,2,2,1
+2026-09-28,5164,2243,0,rays,6,27,1
+2026-09-28,5164,2243,0,rock wrasse,2,10,1
+2026-09-28,5164,2243,0,salema,5,29,2
+2026-09-28,5164,2243,0,salema (school),1,1,5
+2026-09-28,5164,2243,0,sargo,2,2,1
+2026-09-28,5164,2243,0,sea basses,3,21,1
+2026-09-28,5164,2243,0,"sea chubs (opaleye, halfmoon)",1,1,1
+2026-09-28,5164,2243,0,senorita,2,2,1
+2026-09-28,5164,2243,0,sheep crab,2,2,1
+2026-09-28,5164,2243,0,silversides & sardines,3,43,3
+2026-09-28,5164,2243,0,small fish (school),,943,400
+2026-09-28,5164,2243,0,surfperches,1,1,1
+2026-09-28,5164,2243,0,"wrasses (senorita, sheephead)",7,17,2
+2026-09-28,5164,2243,0,yellowtail amberjack,1,1,1
+2026-09-28,5164,2243,0,zebra-perch sea chub,2,2,1

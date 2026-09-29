@@ -1,925 +1,232 @@
 # PierTracker
 
-Live cams from the Scripps Pier in La Jolla, California, running as a Windows desktop
-wallpaper, plus an animal tracker that watches the underwater cam and logs what swims by.
+Live cams from the Scripps Pier in La Jolla, California, as a Windows desktop wallpaper, plus an animal
+tracker that watches the underwater cam and logs what swims by.
 
-- **One monitor:** the [Scripps Pier cam](https://scripps.ucsd.edu/piercam) looking over La Jolla Shores.
-- **The other:** the [Under Scripps Pier cam](https://coollab.ucsd.edu/pierviz/), about 4 m down on a pier piling.
-- **Tracker:** every 10 seconds it takes a frame from the underwater cam, finds fish, octopus, crabs,
-  rays, sea lions and more, names them, and records the results in a database. Schools are logged as schools,
-  not as hundreds of fish. Sightings it isn't sure about are saved as pictures for a person to approve.
-  Hourly conditions at the pier (water temperature, turbidity, chlorophyll, tide...) are recorded alongside.
-  Once a day the summary below updates itself.
+- **One monitor:** the [Scripps Pier cam](https://scripps.ucsd.edu/piercam) over La Jolla Shores.
+- **The other:** the [Under Scripps Pier cam](https://coollab.ucsd.edu/pierviz/), about 4 m down on a piling.
+- **The tracker** looks at the underwater cam every 2 seconds, finds and names fish, octopus, lobsters,
+  rays, sea lions and more, and records them next to the conditions at the pier (water temperature,
+  turbidity, tide, El Niño). What it isn't sure of goes to a person. The summary below updates daily.
+- **Rewind:** the underwater video is kept on the PC for about two days, so anything seen on it can be
+  watched again, frame by frame, and kept.
 
-A project by Joshua Frommeyer, built with Claude. See [How this was built](#how-this-was-built).
-
-It is built to stay out of the way. It runs in Windows Efficiency mode, the tracker's models run on the
-otherwise idle Intel integrated GPU, and everything unloads while a game or other full-screen app runs.
-See [Performance](#performance).
+A project by Joshua Frommeyer, built with Claude ([how](#how-this-was-built)). It stays out of the way:
+Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything unloads while a game runs.
 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-09-27 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-27 21:49:06.
+_Last updated 2026-09-28 21:02 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-28 21:01:37.
 
 | | |
 |---|---|
-| Days tracked | 3 |
-| Snapshots analyzed (one every 10 s while streaming) | 3,942 |
-| Clear-water daylight footage analyzed | 9.2 h |
+| Days tracked | 4 |
+| Snapshots analyzed (one every 10 s while streaming) | 9,513 |
+| Clear-water daylight footage analyzed | 17.3 h |
 | Daylight too murky to identify anything | 0.0 h |
-| Animal types seen repeatedly or confirmed | 19 |
+| Animal types seen repeatedly or confirmed | 29 |
 
 ### Animals seen
 
-The tracker can't tell individual fish apart, so none of these numbers count individuals:
-- **Encounters**: sightings of the same animal less than 30 minutes apart are one encounter (the
-  usual camera-trap rule for independent detections). A kelp bass that hangs around the camera for
-  an hour is one encounter. Two encounters can still be the same fish coming back.
+- **Most at once (MaxN)**: the most of that animal in one frame, i.e. how many were certainly there.
+  It's the standard head count for underwater cameras: a fish that swims out and back can't be
+  counted twice. (What no camera count can do is recognize a particular fish, e.g. whether today's
+  kelp bass is yesterday's.) For schools of small fish it's a rough, rounded estimate.
+- **Encounters**: separate visits. Sightings less than 30 minutes apart are one encounter, the usual
+  camera-trap rule, so a kelp bass that stays for an hour is one encounter.
 - **Snapshots**: how many snapshots (one every 10 s) it was in, i.e. how long it was around.
-- **Most at once (MaxN)**: the most seen in a single snapshot, the standard count for underwater
-  video because no fish can be counted twice. It undercounts big schools.
+  The frames in between (every 2 s) catch animals that pass quickly: those count as encounters.
 
-Five or more of one kind in a snapshot is logged as a **school**; for schools of small fish
-(too small to name) the count is a rough estimate from the moving specks, rounded.
-
-Names are guesses by an AI model that wasn't trained on this camera. **Checked** says how many
-of its names a person has looked at so far, and how many were right. Listed here: animals a person
-has confirmed, or seen repeatedly (10+ snapshots or 3+ separate encounters). Brief one-off guesses are listed separately below the table. Sightings found to be wrong by checking
-the pictures are corrected (a lobster's antenna is not a stingray).
+Names come from BioCLIP 2.5, a general model of living things. A classifier trained on this camera's own pictures takes over each animal once it has 12+ review answers (retrained nightly, and used only where it beats BioCLIP). None has enough yet: 65 answers so far, and blacksmith is closest with 11. **Checked**: how many of the names a person has checked, and how many were right. Listed: animals a person confirmed or seen repeatedly (10+ snapshots or 3+ encounters). Sightings found wrong by checking the pictures are corrected.
 
 | Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | — | 1,594 | 48.14% | 600 | 3 | 2026-09-25 | 2026-09-27 | — |
-| fish (unidentified) | fish | — | 471 | 14.23% | 4 | 3 | 2026-09-25 | 2026-09-27 | — |
-| blacksmith | fish | 6 | 391 | 11.81% | 4 | 3 | 2026-09-25 | 2026-09-27 | not yet |
-| California spiny lobster | invertebrate | 6 | 163 | 4.92% | 1 | 3 | 2026-09-25 | 2026-09-27 | not yet |
-| kelp bass | fish | 8 | 119 | 3.59% | 2 | 3 | 2026-09-25 | 2026-09-27 | not yet |
-| silversides & sardines | fish | 8 | 65 | 1.96% | 4 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| salema | fish | 7 | 44 | 1.33% | 4 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| blacksmith (school) | fish | 4 | 38 | 1.15% | 9 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| Pacific sardine | fish | 9 | 27 | 0.82% | 2 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| sea basses | fish | 1 | 22 | 0.66% | 1 | 1 | 2026-09-27 | 2026-09-27 | not yet |
-| fish (unidentified) (school) | fish | — | 17 | 0.51% | 8 | 3 | 2026-09-25 | 2026-09-27 | — |
-| jacksmelt | fish | 5 | 16 | 0.48% | 2 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| rock wrasse | fish | 3 | 12 | 0.36% | 1 | 1 | 2026-09-26 | 2026-09-26 | not yet |
-| wrasses (senorita, sheephead) | fish | 4 | 11 | 0.33% | 1 | 2 | 2026-09-26 | 2026-09-27 | not yet |
-| jack mackerel | fish | 3 | 9 | 0.27% | 1 | 2 | 2026-09-26 | 2026-09-27 | not yet |
-| opaleye | fish | 5 | 8 | 0.24% | 1 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| giant kelpfish | fish | 5 | 7 | 0.21% | 1 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| yellowtail amberjack | fish | 3 | 6 | 0.18% | 1 | 1 | 2026-09-26 | 2026-09-26 | not yet |
-| octopus | invertebrate | 3 | 6 | 0.18% | 1 | 1 | 2026-09-27 | 2026-09-27 | not yet |
-| mackerels & bonito | fish | 3 | 4 | 0.12% | 1 | 2 | 2026-09-25 | 2026-09-26 | not yet |
-| topsmelt | fish | 3 | 4 | 0.12% | 1 | 3 | 2026-09-25 | 2026-09-27 | not yet |
-| rays | shark/ray | 3 | 3 | 0.09% | 1 | 2 | 2026-09-26 | 2026-09-27 | not yet |
+| small fish (school) | fish | — | 2,537 | 40.71% | 600 | 4 | 2026-09-25 | 2026-09-28 | — |
+| fish (unidentified) | fish | — | 821 | 13.17% | 4 | 4 | 2026-09-25 | 2026-09-28 | — |
+| blacksmith | fish | 12 | 459 | 7.37% | 4 | 4 | 2026-09-25 | 2026-09-28 | 3 of 3 right |
+| California spiny lobster | invertebrate | 12 | 374 | 6.00% | 1 | 4 | 2026-09-25 | 2026-09-28 | not yet |
+| kelp bass | fish | 11 | 150 | 2.41% | 2 | 4 | 2026-09-25 | 2026-09-28 | not yet |
+| silversides & sardines | fish | 11 | 108 | 1.73% | 4 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| salema | fish | 12 | 73 | 1.17% | 4 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| sea basses | fish | 4 | 43 | 0.69% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
+| Pacific sardine | fish | 13 | 41 | 0.66% | 2 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| blacksmith (school) | fish | 5 | 40 | 0.64% | 9 | 3 | 2026-09-25 | 2026-09-28 | 3 of 3 right |
+| fish (unidentified) (school) | fish | — | 34 | 0.55% | 9 | 4 | 2026-09-25 | 2026-09-28 | — |
+| rays | shark/ray | 9 | 30 | 0.48% | 1 | 3 | 2026-09-26 | 2026-09-28 | not yet |
+| bat ray | shark/ray | 5 | 29 | 0.47% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| jack mackerel | fish | 8 | 29 | 0.47% | 1 | 3 | 2026-09-26 | 2026-09-28 | not yet |
+| wrasses (senorita, sheephead) | fish | 11 | 28 | 0.45% | 2 | 3 | 2026-09-26 | 2026-09-28 | not yet |
+| rock wrasse | fish | 5 | 22 | 0.35% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| jacksmelt | fish | 8 | 20 | 0.32% | 2 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| damselfishes (garibaldi, blacksmith) | fish | 8 | 14 | 0.22% | 3 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| diamond stingray | shark/ray | 9 | 12 | 0.19% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
+| giant kelpfish | fish | 7 | 9 | 0.14% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| opaleye | fish | 6 | 9 | 0.14% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| grunts (salema, sargo) | fish | 5 | 8 | 0.13% | 1 | 2 | 2026-09-25 | 2026-09-28 | not yet |
+| mackerels & bonito | fish | 6 | 7 | 0.11% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| yellowtail amberjack | fish | 4 | 7 | 0.11% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| topsmelt | fish | 3 | 4 | 0.06% | 1 | 3 | 2026-09-25 | 2026-09-27 | not yet |
+| queenfish | fish | 4 | 4 | 0.06% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| garibaldi | fish | 3 | 3 | 0.05% | 1 | 2 | 2026-09-25 | 2026-09-28 | not yet |
+| sargo | fish | 3 | 3 | 0.05% | 1 | 2 | 2026-09-25 | 2026-09-28 | 0 of 1 right |
+| black sea nettle jellyfish | invertebrate | 3 | 3 | 0.05% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| sheep crab | invertebrate | 3 | 3 | 0.05% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
+| salema (school) | fish | 2 | 2 | 0.03% | 5 | 2 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| barred sand bass | fish | 1 | 1 | 0.02% | 1 | 1 | 2026-09-25 | 2026-09-25 | 1 of 1 right |
 
-<details><summary>Seen briefly and not yet checked: 25 more names</summary>
+<details><summary>Seen briefly and not yet checked: 22 more names</summary>
 
 The model's guesses for things it saw only briefly. Until a person confirms one, treat these as
 unverified: many will turn out to be a better-known fish seen at an odd angle.
 
-| Animal | Snapshots | First seen | Last seen |
-|---|---:|---|---|
-| bat ray | 4 | 2026-09-25 | 2026-09-27 |
-| garibaldi | 2 | 2026-09-25 | 2026-09-25 |
-| damselfishes (garibaldi, blacksmith) | 2 | 2026-09-25 | 2026-09-26 |
-| Pacific chub mackerel | 2 | 2026-09-25 | 2026-09-26 |
-| Pacific barracuda | 2 | 2026-09-25 | 2026-09-26 |
-| queenfish | 2 | 2026-09-26 | 2026-09-26 |
-| shiner perch | 2 | 2026-09-26 | 2026-09-26 |
-| barred sand bass | 1 | 2026-09-25 | 2026-09-25 |
-| halfmoon | 1 | 2026-09-25 | 2026-09-25 |
-| silversides & sardines (school) | 1 | 2026-09-25 | 2026-09-25 |
-| croakers | 1 | 2026-09-25 | 2026-09-25 |
-| California scorpionfish | 1 | 2026-09-25 | 2026-09-25 |
-| Pacific bonito | 1 | 2026-09-25 | 2026-09-25 |
-| finescale triggerfish | 1 | 2026-09-25 | 2026-09-25 |
-| grunts (salema, sargo) | 1 | 2026-09-25 | 2026-09-25 |
-| salema (school) | 1 | 2026-09-25 | 2026-09-25 |
-| pile perch | 1 | 2026-09-25 | 2026-09-25 |
-| sargo | 1 | 2026-09-25 | 2026-09-25 |
-| bullseye pufferfish | 1 | 2026-09-26 | 2026-09-26 |
-| spotfin croaker | 1 | 2026-09-26 | 2026-09-26 |
-| black sea nettle jellyfish | 1 | 2026-09-26 | 2026-09-26 |
-| shovelnose guitarfish | 1 | 2026-09-27 | 2026-09-27 |
-| diamond stingray | 1 | 2026-09-27 | 2026-09-27 |
-| sharks | 1 | 2026-09-27 | 2026-09-27 |
-| sheep crab | 1 | 2026-09-27 | 2026-09-27 |
+| Animal | Encounters | Snapshots | First seen | Last seen |
+|---|---:|---:|---|---|
+| Pacific chub mackerel | 2 | 2 | 2026-09-25 | 2026-09-26 |
+| Pacific barracuda | 2 | 2 | 2026-09-25 | 2026-09-26 |
+| pile perch | 2 | 2 | 2026-09-25 | 2026-09-28 |
+| bullseye pufferfish | 2 | 2 | 2026-09-26 | 2026-09-28 |
+| shiner perch | 1 | 2 | 2026-09-26 | 2026-09-26 |
+| senorita | 2 | 2 | 2026-09-28 | 2026-09-28 |
+| zebra-perch sea chub | 2 | 2 | 2026-09-28 | 2026-09-28 |
+| jellyfish | 1 | 2 | 2026-09-28 | 2026-09-28 |
+| market squid | 2 | 2 | 2026-09-28 | 2026-09-28 |
+| halfmoon | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| silversides & sardines (school) | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| croakers | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| California scorpionfish | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| Pacific bonito | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| finescale triggerfish | 1 | 1 | 2026-09-25 | 2026-09-25 |
+| spotfin croaker | 1 | 1 | 2026-09-26 | 2026-09-26 |
+| shovelnose guitarfish | 1 | 1 | 2026-09-27 | 2026-09-27 |
+| sharks | 1 | 1 | 2026-09-27 | 2026-09-27 |
+| sea chubs (opaleye, halfmoon) | 1 | 1 | 2026-09-28 | 2026-09-28 |
+| surfperches | 1 | 1 | 2026-09-28 | 2026-09-28 |
+| leopard shark | 1 | 1 | 2026-09-28 | 2026-09-28 |
+| purple-striped jellyfish | 1 | 1 | 2026-09-28 | 2026-09-28 |
 
 </details>
 
-### Sightings per day (up to the last 14 days)
+<details><summary>Charts: sightings per day, and by hour of day</summary>
+
+#### Sightings per day (up to the last 14 days)
 
 ```mermaid
 xychart-beta
-    x-axis ["09-25", "09-26", "09-27"]
+    x-axis ["09-25", "09-26", "09-27", "09-28"]
     y-axis "Animal snapshots"
-    bar [1374, 1465, 232]
+    bar [1374, 1465, 226, 1893]
 ```
 
-### When animals show up (all days, Pacific time)
+#### When animals show up (all days, Pacific time)
 
 ```mermaid
 xychart-beta
     x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 731, 880, 610, 256, 220, 199, 122, 42, 11, 0, 0, 0, 0, 0]
+    bar [0, 0, 0, 0, 0, 0, 13, 161, 302, 345, 963, 1074, 815, 449, 336, 299, 119, 40, 42, 0, 0, 0, 0, 0]
 ```
 
-Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: [what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data) and the [camera-trained classifier](results/camera_classifier.md) (trained from the review answers) and the [reference-photo classifier](results/reference_probe.md) (in shadow mode until it beats the names on review answers).
+</details>
+
+Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learning from the data: [what brings animals in](results/conditions_model.md) (fitted once there are 3 weeks of data), the [camera-trained classifier](results/camera_classifier.md) and the [reference-photo classifier](results/reference_probe.md) (in shadow mode until it beats the names on review answers).
 
 ### Conditions at the pier
 
-**2026-09-27:** water 22.5 °C at ~5 m, **+2.5 °C** vs. normal for the date. Turbidity 0.35 NTU, chlorophyll 0.53 µg/L. El Niño index **+1.8** (El Niño).
+**2026-09-28:** water 22.7 °C at ~5 m, **+2.8 °C** vs. normal for the date. Turbidity 0.57 NTU, chlorophyll 0.54 µg/L. El Niño index **+1.8** (El Niño).
+
+<details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["09-25", "09-26", "09-27"]
-    y-axis "°C" 19 --> 24
-    line [22.76, 22.13, 22.49]
-    line [20.12, 20.06, 20.0]
+    x-axis ["09-25", "09-26", "09-27", "09-28"]
+    y-axis "°C" 18 --> 24
+    line [22.76, 22.13, 22.53, 22.71]
+    line [20.12, 20.06, 20.0, 19.94]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
-
-<details><summary>Daily conditions, last 14 days</summary>
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2026-09-25 | 22.8 | +2.6 | 0.28 | 0.50 | 33.44 | 7.25 | 7.97 | 1.57 | 1,374 |
 | 2026-09-26 | 22.1 | +2.1 | 0.24 | 0.47 | 33.43 | 7.26 | 7.96 | 1.52 | 1,465 |
-| 2026-09-27 | 22.5 | +2.5 | 0.35 | 0.53 | 33.44 | 7.22 | 7.96 | 1.69 | 232 |
+| 2026-09-27 | 22.5 | +2.5 | 0.35 | 0.55 | 33.44 | 7.20 | 7.96 | 1.69 | 226 |
+| 2026-09-28 | 22.7 | +2.8 | 0.57 | 0.54 | 33.46 | 7.12 | 7.96 | 1.70 | 1,893 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
 </details>
 
+### Confirmed by hand
+
+Sightings the tracker wasn't sure about are saved for review. These were checked by a person: 8 confirmed as the animal below, 0 rejected (not an animal). They are listed here separately and not added to the counts above.
+
+| Animal | Confirmed | Last confirmed |
+|---|---:|---|
+| blacksmith | 7 | 2026-09-25 |
+| salema | 1 | 2026-09-25 |
+
 ### Validation (hand-checked samples)
 
-_No names have been checked by a person yet, so treat the names above as unverified model guesses._
+8 of the tracker's names checked by a person so far; 75% were named correctly.
+
+| Animal | Checked | Correct | Precision |
+|---|---:|---:|---:|
+| blacksmith | 3 | 3 | 100% |
+| sargo | 1 | 0 | 0% |
+| barred sand bass | 1 | 1 | 100% |
+| jacksmelt | 1 | 1 | 100% |
+| salema | 1 | 1 | 100% |
+| bullseye pufferfish | 1 | 0 | 0% |
 <!-- RESULTS:END -->
 
-## How it works
+## How it works, in short
 
-### The wallpaper (`host/`, the LiveCams app)
+1. **The wallpaper** (`host/`, C# and WebView2) shows each cam's official page, trimmed to its player, in
+   the desktop's wallpaper layer. It saves a frame of the underwater cam every 2 s, and keeps the video
+   pieces its player downloads for rewinding.
+2. **The tracker** (`tracker/`, Python and OpenVINO) looks at each frame. One every 10 s is a *snapshot*,
+   the basis of the statistics; the frames in between catch whatever passes quickly. It skips night and
+   murky water, ignores what doesn't move or only sways (pilings, hanging growth, flickering water),
+   boxes fish with the [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
+   and names animals with [BioCLIP 2.5](https://huggingface.co/imageomics/bioclip-2.5-vith14).
+3. **A person has the last word.** Unsure sightings, and a sample of sure ones, go to a review window with
+   reference photos to compare. The answers correct the statistics and train a classifier on this
+   camera's own pictures, which takes over animal by animal.
+4. **Every night** at 10 pm it fetches the day's conditions, retrains, publishes this summary and backs up
+   the data.
 
-A small C# (.NET 8, WinForms) app opens one borderless window per monitor and places it in the
-desktop's wallpaper layer, behind the icons. Each window is a WebView2 (Edge) browser that loads the
-cam's **official page** and restyles it so only the video player shows, full-screen. Because the page
-really is the official one, the embedded players run exactly as the site intends. No streams are copied or
-rebroadcast.
+More: [how it works](docs/HOW_IT_WORKS.md) · [how well it works](docs/VALIDATION.md) ·
+[setup, settings and files](docs/SETUP_AND_USE.md) · [learning SQL on this data](docs/SQL_WALKTHROUGH.md)
 
-- **Scripps Pier cam (Surfline player):** Scripps set this player to pause itself after 5 minutes.
-  LiveCams follows that pause. It only resumes the player while someone is actually looking: the monitor
-  isn't mostly covered by a window, and there was keyboard or mouse input in the last 2 minutes.
-- **Underwater cam (HDOnTap player):** the stream keeps running so the tracker always has frames. To keep
-  the desktop calm (at night it's just sensor noise), the picture freezes after 5 minutes. Click the
-  desktop on that monitor to go live again.
-- **Click the empty desktop** on either monitor to resume that cam, or reload it if the player broke.
-- **Full-screen apps (games, videos):** every cam is swapped for a still image and the players are unloaded:
-  0% CPU, no network, no GPU. They come back 20 s after the full-screen app closes.
-- Analytics, ad and captcha scripts on the cam pages are blocked. None of them are needed to show the cams.
-- The app restarts itself if Explorer restarts or the monitor setup changes, and reloads a cam whose
-  video stops advancing for 3 minutes. If the cams ever drop off the desktop without that notice, it
-  rebuilds them within a minute. A shutdown that fails partway is logged and finished anyway, and one
-  that hangs is cut off after 30 s, so the restart can't get stuck.
+## How far to trust the names
 
-### How the tracker finds and names animals (`tracker/`)
+- On photos of 25 local species made to look like this camera, 81% of the names it logged were right.
+  It logs what it isn't sure of as unidentified, or a look-alike group, rather than guess.
+- Live footage is harder (green, blurry, backlit). That's what the **Checked** column measures, and why
+  names are corrected when a picture shows they were wrong.
+- Its known traps, and how each is handled, are in [validation](docs/VALIDATION.md): a lobster's antenna
+  called a stingray, swaying growth called a leopard shark, empty water and dusk noise called an octopus.
 
-```mermaid
-flowchart LR
-    A["Underwater player<br/>(on the wallpaper)"] -->|"video frame<br/>every 10 s"| B{"Too dark?"}
-    B -->|yes| N["Counted as a night snapshot.<br/>No model runs."]
-    B -->|no| V{"Water clear<br/>enough?"}
-    V -->|"too murky"| N2["Counted as a murky snapshot.<br/>No model runs."]
-    V -->|"clear or hazy"| M["What moved?<br/>(vs. a learned background)"]
-    M --> D["Fish detector<br/>(RF-DETR Nano):<br/>moving boxes only"]
-    M --> C["Moving areas + whole frame<br/>to BioCLIP 2.5: octopus, crab,<br/>jelly, sea lion, diver...?"]
-    D -->|"under 80 px"| U["small fish, or one<br/>'small fish (school)'<br/>with a rough size"]
-    D -->|"80 px or more"| F["BioCLIP 2.5 names it<br/>(fish names only)"]
-    C -->|sure| G[("data/piertracker.db")]
-    F -->|sure| G
-    U --> G
-    C -->|not sure| R["Review window:<br/>picture + top 3 guesses"]
-    F -->|"not sure, or a<br/>sample to check"| R
-    R -->|"a person decides"| I
-    G --> H[("hourly summary")] --> I["This README<br/>(daily)"]
-```
+## Using it
 
-1. **Frame capture.** The wallpaper copies the current video frame straight from the player (1920×1080,
-   without logos or overlays) to `frames/underwater/latest.jpg` every 10 s. No second stream is opened.
-2. **Night skip.** The tracker shrinks the frame to 64×36 and checks brightness, detail and color. At
-   night the camera shows only purple-grey noise, and in daylight the water here is green. Night frames are
-   counted but never reach a model.
-3. **Murky water.** Every frame gets a **visibility** score: how much fine detail is left (edges of
-   pilings, fish, growth), which murky water washes out. Clear water here scores 2–3. It's averaged over
-   3 frames so the state doesn't flicker.
-   - **Hazy** (below 1.4): fish and schools are still counted, but no species are named. Only a
-     look-alike group at 95%+ is logged, and nothing goes to the review queue, since a person couldn't
-     judge it either.
-   - **Too murky** (below 0.2): nothing is identified. The frame is logged as murky, like a night frame,
-     and it doesn't count as effort. A murky day then reads "couldn't see", not "no fish".
-   - The cutoffs come from a test (see Validation): as simulated murk increased, naming accuracy fell
-     from 92% to 50% long before detection gave out.
-4. **Motion.** The camera never moves, so the tracker keeps a slowly updated background of the scene,
-   covering roughly the last 100 seconds, and marks what changed. Pilings, the rope hanging from the pier
-   and the growth on them never move. The live test showed they are the main source of false sightings,
-   so anything that didn't move is ignored.
-   - **Fixed things that sway.** Some structure does move: growth hanging off the crossbeam and a round
-     growth on the right-hand piling sway in the surge (and the camera itself sways a little), and the
-     model named them with high confidence ("leopard shark", "green sea turtle 100%"). Two things tell
-     them apart from animals:
-     - a **long-term background**: the median of one clear frame every 5 minutes over the last hour.
-       Everything fixed is in it; a passing fish isn't. But neither is a lobster that has sat in its
-       crevice for half an hour, so this alone can't decide.
-     - a **gallery of what people confirmed**: every review picture marked "not an animal" (a fixture)
-       or approved as an animal, with where it was.
+**Setup:** double-click **`Set up and start LiveCams.bat`**. It installs what's missing, restores the data
+from the Google Drive backup if there is one, builds everything and starts it; it's safe to run any time.
+[By hand](docs/SETUP_AND_USE.md#setup).
 
-     A crop that looks like a confirmed fixture at the same place (and like the background there) is
-     ignored. A crop that looks like the background at a place **nobody has confirmed** isn't logged:
-     it goes to the review queue, so a person decides whether it's swaying growth or a lobster sitting
-     still. Everything else is logged as usual. Each review answer makes the next decision automatic.
-   - **Look-alikes of confirmed animals.** The model has never been taught what a spiny lobster's
-     antenna looks like through this water, and called it a stingray or a ray. A crop that looks almost
-     exactly like a picture a person confirmed as a non-fish animal, at the same place (similarity 0.82+),
-     is logged as that animal instead. On the first day's review pictures that caught about 14 of 17
-     antenna pictures and none of 155 others; a text label for "lobster antenna" had helped only 1 in 15.
-     Fish names are left to the camera-trained classifier.
-     See Validation, section 4.
-5. **Fish.** [Community Fish Detector](https://github.com/filippovarini/community-fish-detector)
-   (RF-DETR Nano, 640 px, trained on 30+ community fish datasets) boxes fish above 0.35 confidence, and
-   only boxes where something moved are kept.
-   - **Under 80 px** (most of the school, silhouetted against the surface) isn't named. Nobody can tell a
-     topsmelt from a sardine at that size. When there are five or more, the whole school is logged once
-     per snapshot as **small fish (school)**. Its size is estimated by counting the small moving specks,
-     because the detector only boxes a few of them. The estimate is rounded (~150, ~400) to avoid false
-     precision. Fewer than five are logged as **small fish**.
-   - **80 px and up** is cropped and embedded by [BioCLIP 2.5](https://huggingface.co/imageomics/bioclip-2.5-vith14),
-     a vision model trained on the Tree of Life that can match an image against species names it has never
-     been fine-tuned on (zero-shot). The crop is compared only with the **fish** among the 72 animals in
-     [`tracker/species.json`](tracker/species.json), plus 9 "not an animal" labels (murky water, kelp, pier
-     piling...). So a blurry fish can't come out as an octopus.
-   - **Look-alike groups.** Many mistakes are between look-alikes: topsmelt vs. jacksmelt vs. anchovy vs.
-     sardine, or opaleye vs. halfmoon. So when no species reaches **0.85** but the model is sure it's one
-     of a group (their probabilities add up to **0.90+**), the **group** is logged instead: "silversides &
-     sardines", "surfperches", "sea basses", "grunts (salema, sargo)" and so on (see `species.json`).
-     Otherwise it's **fish (unidentified)**. One species has a stricter cutoff (`min_prob`): rock wrasse
-     is only named at **0.97**, since at 0.85 it took blacksmith's name; below that it's the wrasse group.
-   - **Following fish across frames.** When a fish big enough to name shows up, LiveCams is asked for
-     a frame every ~3 s for 20 s (at most 10 min of this per hour). Detections close to where the fish
-     was a moment ago are treated as the same fish, and it's named from the **average of all its
-     looks**, which is steadier than any single frame. In a test that was ~5 points more accurate (see
-     Validation). Each fish becomes one row in the database's `visits` table (arrival, departure, looks,
-     name), so individual visits can be counted, not just snapshots. Other animals (a lobster on the
-     piling, a turtle, a seal) are one visit as long as they keep showing up within 5 minutes. The extra burst frames feed only
-     the naming and the visits, never the snapshot statistics, because bursts happen exactly when fish
-     are around and would inflate them.
-   - Once the **camera-trained classifier** has learned from enough review answers (see
-     [Learning from the data](#learning-from-the-data)), its answer is used first for the animals it
-     knows.
-6. **Everything else.** The fish detector doesn't box octopus, crabs, lobsters, jellyfish, sea hares,
-   sea lions or divers. So the biggest moving areas (larger than a small fish), and the whole frame when a
-   lot of it moved, are compared against every label (72 animals + 9 "not an animal"). A "scene" animal
-   (marked in `species.json`) counts when it wins with at least 0.70 probability. In a small moving area
-   it needs 0.90, or it has to show up again within 30 s: a real lobster stays put, but a flicker of fish
-   at a piling edge doesn't.
-7. **A person has the last word.** Two kinds of pictures go to the review window (`data/review/pending`):
-   - **"Not sure"**: a fish whose best name scored 0.25–0.85, or a non-fish between 0.40 and the bar
-     above. It is logged as unidentified, or not at all, until someone looks.
-   - **"Is this right?"**: a sample of the names the tracker *did* log. At most one per animal per hour,
-     plus every rare non-fish sighting. The answers are the published accuracy.
+Everything is in the tray icon's menu (a wave):
 
-   Each picture shows the close-up, where it was in the frame, and the top 3 guesses. There are at most
-   ~10 an hour. See [Reviewing uncertain sightings](#reviewing-uncertain-sightings).
-8. **Logging.** Everything goes into one place, the SQLite database `data/piertracker.db` (see
-   [The database](#the-database-sql)), where every write is all-or-nothing:
-   - `snapshots`: every analyzed frame, including dark and murky ones, so rates can be computed fairly.
-   - `sightings`: one row per animal type per snapshot, with the count, confidence and `method`: how it
-     was named, `zero-shot` (BioCLIP), `camera-trained`, or `detector only` (small or unidentified fish).
-   - Five or more of one named kind in a snapshot is one row flagged as a school, shown as
-     **"<kind> (school)"**, for example "blacksmith (school)", with the count.
-   - Once a day, `tracker/publish_results.py` summarizes it per hour and per day into the results section
-     above and `results/*.csv`, and pushes them. The statistics start at 2026-09-25 10:01, when the
-     current model took over; earlier snapshots stay in the database.
-
-Both models are converted once to [OpenVINO](https://github.com/openvinotoolkit/openvino) (half
-precision). The running tracker needs only OpenVINO, NumPy and Pillow, not PyTorch. It runs the models on
-the Intel integrated GPU when there is one, and never on a discrete card. Without one, it uses two CPU
-efficiency cores.
-
-### Conditions at the pier (`tracker/environment.py`)
-
-Once a day the tracker fetches hourly conditions from two public, quality-controlled sources on the pier
-itself, and saves them next to the sightings (`data/environment_hourly.csv`, published as
-[`results/environment_hourly.csv`](results/environment_hourly.csv)):
-
-| Source | Measures | Notes |
-|---|---|---|
-| [NOAA tide gauge 9410230 "La Jolla"](https://tidesandcurrents.noaa.gov/stationhome.html?id=9410230) | Predicted tide and observed water level (m above MLLW), rising/falling, water and air temperature, wind, air pressure | Official NOAA data |
-| [SCCOOS Automated Shore Station, Scripps Pier](https://sccoos.org/autoss/) | Water temperature, salinity, dissolved oxygen, pH, turbidity, chlorophyll | Sensors ~5 m deep, next to the camera's ~4 m. Only readings that passed the station's [QARTOD](https://ioos.noaa.gov/project/qartod/) quality tests are kept |
-| Same shore station, daily means since 2013 | **Temperature anomaly**: how much warmer or colder than normal the water is for that date | Normal for each date = 2013–2025 mean, smoothed ±15 days. Late September's normal is ~20 °C; on 2026-09-25 the water was **+2.6 °C** above it |
-| [NOAA Oceanic Niño Index (ONI)](https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt) | The official El Niño / La Niña measure (El Niño at +0.5 or more) | 2026 is an El Niño year: ONI +1.8 for Jun–Aug, and NOAA's El Niño Advisory gives >90% odds of a very strong event this fall and winter |
-
-The sources were checked before use:
-- On the first day, NOAA's water temperature (22.5 °C) and the shore station's (22.46 °C) agreed.
-- One of the station's two chlorophyll sensors wasn't reporting, so the working one is used.
-- About 12% of turbidity readings fail quality control, and those are dropped.
-
-Each value is the median of that hour's readings. Two public files, from the least to the most detail:
-- [`results/daily_conditions.csv`](results/daily_conditions.csv): one row per day, with water temperature
-  (mean, min, max, normal for the date, anomaly), turbidity, chlorophyll, salinity, oxygen, pH, tide
-  range, air temperature, wind, the El Niño index, and that day's clear/murky tracking effort and
-  sightings. The README shows the headline, a temperature chart and a folded table.
-- [`results/environment_hourly.csv`](results/environment_hourly.csv): every hour, to join with the hourly
-  sightings (`results/hourly_summary.csv`) on `date` + `hour`. Recording through a strong El Niño makes this a good season to
-start: warm-water visitors and missing regulars should both show up against the temperature anomaly.
-
-### What the numbers mean
-
-- A **snapshot** is one analyzed frame (every 10 s). The tracker doesn't follow individual animals between
-  frames, so a garibaldi that hangs around for a minute appears in about 6 snapshots. "Snapshots seen" is
-  a measure of **presence over time**, not a head count.
-- **Count** is how many of that animal were in a single snapshot. For a school of small fish it's a
-  rounded estimate from the moving specks. It gets the order of magnitude right (a hundred vs. a few
-  hundred), not the exact number.
-- Animals that never move (anemones, mussels on the piling) aren't in the species list on purpose.
-
-## Validation
-
-The models were not trained on this camera, so the tracker's work gets checked two ways.
-
-### 1. Pre-deployment check on reference images
-
-Before going live, the whole pipeline ran on 11 images: clear photos of local species from Wikipedia, and
-frames from this cam (a news frame and the cam's own thumbnails). The first run exposed two problems. The
-big-animal check reported "octopus" on ordinary fish photos, and some partial crops got confident wrong
-names. The thresholds were then raised and the check now has to beat every label. Results after that fix:
-
-| Image | Expected | Tracker output | |
-|---|---|---|---|
-| Garibaldi | garibaldi | garibaldi (1.00) | ✅ |
-| California sheephead | sheephead | California sheephead (1.00) | ✅ |
-| Opaleye | opaleye | opaleye (0.98) | ✅ |
-| California sea lion, underwater | sea lion | California sea lion (1.00) | ✅ |
-| California spiny lobster | lobster | California spiny lobster (1.00) | ✅ |
-| Spiny lobster crawling on **this cam's** lens (news frame) | lobster | California spiny lobster (0.73) | ✅ |
-| Bat ray | bat ray | bat ray (1.00) + 1 fish (unidentified): a second box on the same ray | ⚠️ |
-| Leopard shark with two dark fish, in kelp | leopard shark + 2 fish | leopard shark (0.87), blacksmith (0.83), and 1 fish sent to review (halfmoon 45% / blacksmith 42%) | ⚠️ the fish look like blacksmith or halfmoon; the photo can't settle it |
-| Typical daytime view from **this cam** (tiny, distant fish in green water) | a few specks | nothing: the fish are ~10 px, too small to detect | ⚠️ missed |
-| Above-water photo of the pier | nothing | nothing | ✅ |
-| **This cam** at night | nothing | skipped as dark | ✅ |
-
-The OpenVINO detector was also checked against the original RF-DETR model on the same images. It found
-the same boxes with the same confidences (within 0.01).
-
-The tile scan was tested on the same images and added no false sightings.
-
-**Takeaways:** fish that are clear and close are named reliably. Look-alike species (blacksmith, halfmoon,
-opaleye) come out as close calls, and those go to the review queue instead of into the stats. Tiny,
-distant fish in murky water are missed, which is why the stats count presence rather than claiming a
-census.
-
-One honest correction from testing: that shark photo was first described here as "three leopard sharks",
-and "blacksmith" was counted as a wrong name. The review picture showed two dark fish next to one shark.
-Reviewing the tracker's pictures catches mistakes in both directions.
-
-### 2. First live morning (2026-09-25)
-
-The first version ran on the live cam from sunrise to 08:40 and got a lot wrong. Here's what a look through
-its 84 sample crops and 208 review pictures showed:
-
-| Problem | Example | Fix |
-|---|---|---|
-| Pilings and the hanging rope boxed as fish and given fish names | the rope logged as "sargo" (0.79), a piling as "salema" | Motion filter: things that don't move are ignored |
-| Tiles of the piling named as crabs | "sheep crab" at up to 0.89 on bare piling | Tile scan replaced by moving areas only |
-| Small fish given non-fish names | 40–60 px fish logged as "octopus", "jellyfish", "bat ray" | Fish-detector boxes get fish names only |
-| Tiny backlit fish given confident species names | 50 px silhouettes as "blacksmith" (0.9+) | Under 80 px: "fish (unidentified)" |
-| A night frame got through | noise with a bright blob at 04:40 | Night check also looks at color |
-| Review queue flooded | 208 pictures in ~2 hours | At most ~10 an hour, only things a person can judge |
-| A school of hundreds logged as individual fish | "11 fish (unidentified)" every 10 s | One "small fish (school)" sighting per snapshot, with a rough size |
-
-The fixed version was replayed on 29 consecutive live frames (5 minutes) and then deployed. The data
-logged before the fix was set aside and isn't in the results.
-
-On those 5 minutes the fixed version logged:
-
-| Result | Verdict |
+| Menu | What it does |
 |---|---|
-| 136 fish (unidentified) | ✅ the school, honestly unnamed |
-| 1 **kelp bass** (0.99): a big blotchy bass cruising past a piling | ✅ looks right |
-| 2 Pacific sardine | ✅ plausible: slender, silvery |
-| A "spiny lobster" at a piling edge (0.72) | Held back and sent to review. I first judged it "fish passing a cable". But the long curved "cable" and the lumpy shape at the piling were **gone an hour later**, so it was almost certainly a real lobster, with its long antennae. The model saw it; the quick human look didn't. |
-| 23 **blacksmith** (0.94–0.99) | ❓ doubtful. Several crops look like yellow **señoritas** or olive fish, not dark blacksmith. BioCLIP is overconfident on green, blurry footage. |
-
-### 3. Fixing the overconfidence: a controlled test
-
-Live footage has no answer key, so the next test used one. 150 research-grade iNaturalist photos of
-25 local species were made to look like this camera:
-- the fish shrunk to 80–130 px
-- the water's color cast applied: red nearly gone, measured from real frames as green in the morning
-  and blue at midday
-- JPEG compression and noise added
-
-That gave 300 test images, and each method was scored the way the tracker uses it.
-
-| Method | Top guess right | Of names logged at ≥0.6, right | Of names logged at ≥0.9, right |
-|---|---:|---:|---:|
-| BioCLIP 2 (the first version) | 46% | 57% | 67% (22% of images named) |
-| BioCLIP 2 + color correction | 22% | 28% | 49% |
-| **BioCLIP 2.5** | **53%** | **64%** | **79% (49% named)** |
-| BioCLIP 2.5 + color correction | 39% | 49% | 69% |
-
-- **Color correction makes it much worse.** The model knows blue-green underwater photos, and "fixing"
-  the colors distorts what it relies on. It isn't used.
-- **BioCLIP 2.5 is better at every cutoff,** so the tracker switched to it. It runs on the iGPU,
-  using ~0.65 GB more memory.
-- **The cutoffs were then tuned on the deployed model** (OpenVINO, iGPU). With species at 0.85 and
-  look-alike groups at 0.90, **81% of logged names were right**, with 56% of fish named. The rest are
-  logged as unidentified rather than guessed. The first version's 0.6 cutoff gave ~57–64%.
-- **Other models tested and not used:**
-  - iNaturalist-trained classifiers (EVA-02, ConvNeXt on iNat 2021) know only 10 of 30 key local
-    species: no blacksmith, señorita, topsmelt, sardine or anchovy. A trained classifier can't name what
-    it wasn't trained on, and their license is non-commercial.
-  - Orange's [marine-detect](https://github.com/Orange-OpenSource/marine-detect) MegaFauna model
-    (sharks, rays, turtles) found 0 of 48 sharks and rays pasted into real pier frames. On clean photos
-    it called leopard sharks "turtle". It was trained on tropical reef species.
-
-**Murky-water calibration.** Sixty known fish were pasted into real pier frames, and haze + blur was
-increased step by step:
-
-| Murk | Visibility score | Fish found | Names right |
-|---|---:|---:|---:|
-| none | 2.3 | 63% | 92% |
-| light | 1.6 | 57% | 81% |
-| moderate | 1.1 | 58% | 50% |
-| heavy | 0.5 | 68% | 29% |
-| very heavy | 0.27 | 67% | 21% |
-| near-opaque | 0.12 | 33% | 0% |
-
-Counting holds up far longer than naming, which sets the two cutoffs: hazy below 1.4 (count only) and
-too murky below 0.2 (nothing). Real clear frames today score 2.1–3.1. Once there's murky weather, the
-score can be checked against the pier's turbidity sensor (a good SQL exercise).
-
-**Three more ideas, tested the same way:**
-
-| Idea | Result | Used? |
-|---|---|---|
-| Test-time augmentation (classify flipped/re-cropped copies and average) | No gain in accuracy (79% vs 80%), fewer fish named | No |
-| Averaging several looks at the same fish (proxy for following it across frames) | **85% of names right vs 80%**, fewer fish named | **Yes**: burst frames + visits |
-| Local species priors from iNaturalist records near the pier | Not used on its own: iNaturalist reflects what divers photograph (6 sardine records, but sardines school here constantly). The camera-trained classifier learns this camera's real frequencies from review answers instead. | Its species list, yes |
-
-**The species list.** iNaturalist research-grade records within 1.5 km of the pier showed locally
-common fish missing from the list. The model can only answer with names it's given, so a zebra-perch
-swimming by was *forced* into a wrong name. 13 were added (zebra-perch sea chub, giant kelpfish, ocean
-whitefish, rockfishes, croakers, sanddab, lizardfish, greenling, cabezon, grunion, diamond stingray,
-banded guitarfish), for 57 animals (three later removed, see below). On known-species photos of all 38
-species tested:
-
-| Species list | Photos of the original 25 | Photos of the 13 added | All 38 |
-|---|---:|---:|---:|
-| 44 animals | 75% of names right | 11% (no right name available) | 56% |
-| 57 animals | 70% | 82% | **74%** |
-
-The cost is that new labels sometimes "steal" answers: ocean whitefish took 3 and zebra-perch 4 of 456.
-
-**Then the deep-water species were taken out again.** On the live cam, the small, yellow-tailed fish
-schooling near the pilings went from mostly "blacksmith" to mostly "ocean whitefish". The field guides
-settle it:
-- Juvenile blacksmith are blue-grey in front and bright yellow-orange behind until ~5 cm
-  ([Aquarium of the Pacific](https://www.aquariumofpacific.org/onlinelearningcenter/species/blacksmith)),
-  and school in midwater around structure.
-- Ocean whitefish live 10–91 m down, mostly 24–55 m, near the bottom
-  ([CDFW](https://marinespecies.wildlife.ca.gov/ocean-whitefish/the-species/)). They are unlikely at 4 m.
-
-The iNaturalist records that suggested ocean whitefish and rockfish come from dives in the nearby La
-Jolla Canyon. A direct test confirmed it: 10 photos of *juvenile* blacksmith, degraded to camera
-quality, came out "ocean whitefish" 11 times out of 30 (confidently) and "blacksmith" only 6. Without
-the three deep-water species (ocean whitefish, vermilion and brown rockfish), no confident wrong names
-were left: 7 blacksmith, 6 leaning blacksmith but below the cutoff, the rest unsure. That left 54
-animals, all plausible at ~4 m.
-
-**Then what's actually been seen on this camera.** The cam's [highlight
-clips](https://hdontap.com/stream/018408/scripps-pier-underwater-live-webcam/clips/highlight/), the
-Scripps/CoOL pages, news stories and viewer forums list:
-- a **sea turtle** (clip from 2026-09-22; La Jolla Shores has resident green turtles)
-- octopus, seals, a stingray, leopard sharks, cormorants diving, lobsters, giant sea bass
-- a baby garibaldi, mysid shrimp swarms, and swimmers
-
-Fishing and diving reports add seasonal and El Niño visitors: mackerel, bonito, barracuda and yellowtail
-(all reported at La Jolla in 2026), croakers, pelagic red crabs (they swarmed La Jolla Shores in the
-2015 El Niño), pufferfish and triggerfish.
-
-17 candidates were tested the same way, on photos of every current and candidate species:
-
-| Species list | Photos of current species | Photos of candidates | Juvenile blacksmith | All |
-|---|---:|---:|---:|---:|
-| 54 animals | 77% of names right | 8% | 6/20 | 57% |
-| + candidates | 78% | 72% | 6/20 | **76%** |
-
-- **15 were added:** green sea turtle (right 10 of 12), market squid (9/12), queenfish (8/12),
-  finescale triggerfish (7/12), chub and jack mackerel, bonito, barracuda, yellowtail, white seaperch,
-  barred surfperch, white and yellowfin croaker, pelagic red crab and bullseye pufferfish. Most took 0–1
-  answers from other species.
-- **2 were left out:** thornback ray (never right, took 2 answers) and olive ridley turtle (always
-  called green sea turtle, so it added nothing).
-- **Also added:** "swimmer or snorkeler", next to scuba diver.
-
-The list was then **70 animals**.
-
-**Adding species from Scripps' dive counts (2026-09-26).** A Scripps survey of La Jolla's fishes
-([Hastings et al. 2014](https://cmbc.ucsd.edu/wp-content/uploads/sites/399/2015/07/Hastings-et-al-2014-Fishes-of-La-Jolla-MPAs-.pdf))
-counted over 90,000 fish in 500 dive transects at La Jolla Cove and Boomers. Blacksmith and señorita were
-70% of them, and seven species 93%. Six of those seven were on the list; the seventh, **rock wrasse**
-(seen in every survey period), wasn't. Neither were kelp perch, dwarf perch, rainbow surfperch, kelp
-rockfish or tubesnout. (Zebraperch was: it's `zebra-perch sea chub`, *Kyphosus azureus*, its newer name.)
-
-[`tracker/ml/species_eval.py`](tracker/ml/species_eval.py) tests candidates from
-[`species_candidates.json`](tracker/ml/species_candidates.json) with the tracker's own naming rule, on
-832 camera-degraded crops of underwater reference photos of 40 fish. Scores are **weighted by the dive
-counts**, so a candidate that takes señorita or blacksmith names costs what it would on this camera,
-where they're most of the fish. A candidate is added if the weighted score rises, the species already
-listed don't lose more than 1 point, and the share of logged names that are right doesn't drop.
-
-| Candidate | Its own photos named right | Verdict |
-|---|---:|---|
-| rock wrasse | 88% | At 0.85 it took 4 of 72 blacksmith: on this camera about half its names would be wrong. **Added with a 0.97 cutoff** (below it, the wrasse group) |
-| rainbow surfperch | 29% | **Added**: helps a little, takes nothing |
-| kelp perch | 67% | Left out: takes blacksmith, opaleye and giant kelpfish names at any cutoff |
-| tubesnout | 44% | Left out: no gain |
-| kelp rockfish, dwarf perch | 4 and 2 crops | Left out: too few underwater photos to judge |
-
-With both added, on the same crops: named right, weighted **23.0% → 29.7%**; species already listed
-23.9% → 28.1% (rock wrasse's label also pulls señorita and sheephead look-alikes into the wrasse group
-instead of a wrong name); right, of the names logged, 63.8% → 66.8%; false alarms on the camera's
-background 20.3% → 19.7%; young blacksmith unchanged. The 0.97 was chosen on these same crops, so expect
-a smaller gain live; review answers are the real check.
-
-The list is now **72 animals**.
-
-**Also looked at:**
-- NOAA's [AI for protected species](https://www.fisheries.noaa.gov/new-england-mid-atlantic/science-data/using-artificial-intelligence-study-protected-species)
-  uses the same human-in-the-loop active learning as the review queue.
-- [Li et al. 2025](https://doi.org/10.1109/JOE.2024.3455565) pretrain on unlabeled underwater footage
-  (see Next steps; it's the reason for the frame bank).
-
-These are synthetic tests, closer to the camera than clean photos but not the real thing. The review
-answers are the real measure, and they're what the **Checked** column shows.
-
-That last row is why every name in the results carries a **Checked** column, and why the review window
-samples confident names too. Until people check them, the names are the model's guesses.
-
-### 4. Things that sway: an audit of the first day's rare sightings
-
-The rarer names from the first live day were checked by eye against their saved crops, review pictures
-and frame-bank frames. Most were real fish (some with a doubtful species). But **every confident sighting
-of a big or unusual animal came from two fixed things swaying in the surge**:
-- growth hanging off the crossbeam, logged as giant sea bass, leopard shark, shovelnose guitarfish, rays
-  and kelp bass;
-- a round growth on the right-hand piling, unchanged from 7:00 to at least 11:40, logged as sheep crab
-  and green sea turtle (up to 100%).
-
-They moved enough to pass the motion check, and the model was sure of itself (90–100%). What was tried:
-
-1. **"Same place, similar look, again later."** Not safe: different real fish passing the same spot
-   looked as much alike (up to 0.80) as a fixture did to itself (0.76–0.91).
-2. **The long-term background alone** (ignore a crop that matches it). On the first 68 review pictures:
-   16 of 17 fixtures caught, no real fish lost. Live, it let about a third of the fixtures through
-   (swaying and camera movement), and a lower cutoff would have hidden the resident kelp bass by the
-   round growth (up to 0.835). Worse, it **hid a real spiny lobster**: sitting in its crevice at the top
-   of the near piling, the lobster had become part of the background. A viewer saw its antennae at
-   12:21; the tracker had ignored it as structure, while the model called those very crops "California
-   spiny lobster" at 98–100%.
-3. **A gallery of crops the background check ignored.** Caught the swaying growth well, but took the
-   lobster in with it, for the same reason.
-4. **Person-confirmed structure only** (what runs now). Checked on the day's labeled review pictures,
-   each fixture compared only with the *other* confirmed ones:
-
-| | Ignored as structure |
-|---|---:|
-| Confirmed fixtures (22) | 21 |
-| Real fish (59), incl. the resident kelp bass | **0** |
-| The spiny lobster in its crevice (12:35) | **0**, logged |
-
-At places nobody has confirmed, anything that looks like the background goes to the review queue
-instead of being logged, so it's never silently hidden and never counted by mistake. The first day's
-fixture sightings (26 rows) were taken out of the database after checking each by eye; they're kept in
-`data/archive/fixtures-2026-09-25/` with the reason for each.
-
-### 5. Ongoing hand-checks on live footage
-
-Clear reference photos flatter any model. The real test is the live cam, which is often green and murky.
-So the tracker keeps **one sample crop per animal type every 10 minutes** in `data/crops/<date>/`, named
-`<time>_<animal>_<confidence>.jpg`. To check a day:
-
-1. Open `data/crops/<date>` in File Explorer with **Large icons** view.
-2. Create a folder named `wrong` in it, even if everything turns out right. This marks the day as checked.
-3. Move every crop whose name is wrong into `wrong`.
-
-The next daily publish counts the checked crops and shows precision per animal in the **Validation** table
-in the results above. Precision is the share of names that were right. The tallies are kept in
-[`results/validation.csv`](results/validation.csv) even after old crops are deleted (after 14 days).
-Until some days are checked, the results section says the names are unverified.
-
-### 6. Uncertain sightings, checked by a person
-
-The review window is the main check. Answers to **"Is this right?"** pictures become the **Checked**
-column and the **Validation** table. **"Not sure"** pictures that a person approves are listed in
-**Confirmed by hand**, separately from the automatic counts. That's also how rarer animals get recorded
-when the model hesitates.
-
-**Improving it:** checked crops and approved review pictures are exactly the training data needed to go
-past zero-shot. About 50 per species are enough to train a small classifier on BioCLIP's image embeddings,
-which usually beats zero-shot by a wide margin on a specific camera.
-
-## The database (SQL)
-
-Everything the tracker sees also goes into a SQLite database, `data/piertracker.db`, with these tables:
-- `snapshots`: every analyzed frame, with its visibility and whether it was dark or murky
-- `visits`: each fish followed across frames, from arrival to leaving
-- `sightings`
-- `species`
-- `conditions`
-- `reviews`: answers from the review window, with who gave them (`reviewer`)
-
-Questions that combine them are one query. For example, which hours had kelp bass while the water was
-2 °C above normal? The CSVs stay for the public results; the database is the place to explore.
-
-- `tracker\.venv\Scripts\python tracker\sql.py` opens a small SQL shell on a **sandbox copy**, which
-  you can break freely (`.reset` for a fresh copy). Add `--live` for the live database, read-only.
-- [`docs/SQL_WALKTHROUGH.md`](docs/SQL_WALKTHROUGH.md) teaches SQL with this data: filtering, grouping,
-  joins, rates vs. counts, views and window functions.
-
-## Learning from the data
-
-Both pieces are built, tested, and run automatically. They switch themselves on when there's enough data.
-A nightly job (`tracker/nightly.py`) runs at 10 pm at idle priority, after the day's daylight and even while
-LiveCams is paused (if the PC was off or asleep, as soon as LiveCams is running again). It runs:
-
-1. `environment.py`: fetches the day's conditions.
-2. `ml/train_classifier.py`: retrains the camera classifier from the review answers.
-3. `ml/conditions_model.py`: refits "what brings animals in".
-4. `publish_results.py`: updates this README (if publishing is on).
-5. Backs up the database, review answers and frame bank to `tracker.backupDir` (if set).
-
-### Camera-trained classifier (`tracker/ml/train_classifier.py`)
-
-BioCLIP matches pictures against species *names*. It has never seen this camera's green-blue, blurry,
-backlit footage, which is where its overconfidence comes from. Every review picture stores BioCLIP's
-image embedding (1,024 numbers describing the picture), and your answer is its label.
-
-- **How it trains:** a logistic regression on those embeddings learns what each animal looks like *on
-  this camera*. "Not an animal" answers are a class too, so it also learns to throw away piling edges.
-- **When it switches on:** an animal is learned at **12 answers** (~30 makes it reliable), and it needs
-  at least 3 animals. The classifier is only used if it beats zero-shot BioCLIP by 5+ points in
-  cross-validation on the same pictures.
-- **How it's used:** the tracker picks it up automatically and uses its answer when it's 70%+ sure. Every
-  sighting records which method named it.
-- **Progress:** the review window shows the answer count. The report is at
-  [`results/camera_classifier.md`](results/camera_classifier.md); run
-  `tracker\.venv\Scripts\python tracker\ml\train_classifier.py --status` to check it anytime.
-- **Tested** on synthetic data: it trains, cross-validates, beats the baseline and switches on.
-
-### What brings animals in (`tracker/ml/conditions_model.py`)
-
-For each animal seen in 30+ hours, this fits a logistic regression of **whether it was seen at all in
-each clear daylight hour** (yes/no), with that hour's amount of clear footage as a predictor (more
-looking finds more). Yes/no per hour rather than snapshot counts, because the tracker can't tell
-individuals apart: one kelp bass that hangs around the camera for an hour would otherwise look like
-hundreds of sightings. The other predictors are:
-- how much warmer than normal the water is (the local El Niño signal)
-- turbidity and chlorophyll
-- tide height, and whether it's rising
-- time of day
-- the El Niño index, once the data spans months where it changes
-
-Results are odds ratios per typical (1 SD) change with 95% intervals, in
-[`results/conditions_model.md`](results/conditions_model.md). It starts after **21 days** of data.
-
-- **Tested** on 20 synthetic data sets with two made-up animals: one really shows up more in warm water
-  (odds × 2.0 per SD), the other shows up just as often but **lingers longer** when it's warm.
-
-  | | Old model (snapshot counts) | This model (seen in the hour, yes/no) |
-  |---|---|---|
-  | Shows up more when warm (truth 2.0) | underestimated | median 2.24; interval covered 2.0 in 18/20 |
-  | Only lingers longer (truth: no effect) | "effect" found in **20/20** (median 1.79) | "effect" found in 1/20, the expected 5% (median 1.01) |
-
-  The first version counted snapshots and would have reported that lingering fish "like warm water".
-- **Caveats:** it shows associations, not causes. Neighbouring hours aren't independent, so the intervals
-  are optimistic.
-
-### Reference-photo classifier (`tracker/ml/reference_photos.py`, shadow mode)
-
-A small classifier trained on ~500 underwater iNaturalist photos of 48 of the species, degraded to look
-like this camera, plus crops of this camera's own background as "not an animal". On held-out photos it
-named 60.5% of the fish correctly against 49.0% for names alone, with no false alarms on this camera's
-background (against 17.8%). Those are simulated conditions, so it runs in **shadow mode**: every review
-picture carries its opinion next to the tracker's, and each night it's compared with people's answers
-([`results/reference_probe.md`](results/reference_probe.md)). It gets switched on only after beating the
-names by 5+ points on at least 30 answers. One weakness is already visible: an antenna poking out of the
-lobster's crevice looks like background to it.
-
-### Next steps once there's a season of data
-
-- **Occupancy models** separate "not there" from "there but too murky to see", using turbidity and time
-  of day as detection covariates.
-- **Forecasts:** the odds of a sea lion or a ray in the next hour, given the tide and conditions now.
-- **A detector fine-tuned on this camera's small fish** would count schools much better than the
-  motion-speck estimate. Two pieces of prior work point the way:
-  - **Pretraining on our own footage.** [Li et al. 2025, *Self-Supervised Marine Organism
-    Detection*](https://doi.org/10.1109/JOE.2024.3455565) pretrain a detector's backbone on 40,000
-    *unlabeled* underwater images, with underwater-style augmentations (CLAHE, Retinex, motion blur) used
-    during training, then fine-tune it on a few labels. For that, the tracker banks frames from this
-    camera: one every 20 min, plus one every 5 min while a named animal is in view
-    (`data/frame_bank/`, 90 days).
-  - **Labeling tools.** NOAA's protected-species work uses [VIAME](https://www.viametoolkit.org/) and
-    its DIVE annotation tool, with the same human-in-the-loop active learning as the review queue here.
-    DIVE is a good way to draw boxes on banked frames.
-
-## Performance
-
-Measured on the machine this runs on: i7-13700K, Radeon RX 7800 XT, Intel UHD 770, 32 GB RAM.
-
-| State | CPU | GPU | RAM |
-|---|---|---|---|
-| Both cams live + tracker (between frames) | ~0.8% of total CPU | Radeon: 0.25% 3D; video decode on its separate decode engine | ~3.2 GB |
-| Tracker, per daytime frame | ~0.03–0.1 s of CPU time | ~1–3 s on the Intel iGPU with BioCLIP 2.5 (more when many fish are close) | (included above) |
-| Tracker, per night frame | ~0 (no model runs) | none | models unloaded after 10 min dark: ~1.1 GB freed |
-| Full-screen game or app running | 0.0% | none | ~0.7 GB, idle (tracker models unloaded after 10 min) |
-| Turned off (`--off`) | nothing running | none | 0 |
-
-How it stays light:
-- Every process runs in Windows **Efficiency mode**: idle priority plus EcoQoS, which keeps it on the
-  efficiency cores.
-- The tracker's GPU calls use OpenVINO's low-priority queue, so the CPU sleeps while the iGPU works
-  instead of spinning. Measured: 156 ms → 3–25 ms of CPU per model run.
-- The desktop-click hook runs on its own time-critical thread, so it can never add mouse lag. It is removed
-  entirely during games.
-- If the app dies, a Windows job object takes the tracker down with it.
-
-## Setup
-
-**The easy way:** double-click **`Set up and start LiveCams.bat`** in this folder. It checks every step and
-skips what's already done, so it's safe to run any time, including after a Windows reset or on a new PC:
-
-1. Installs what's missing with `winget`: Python 3.12, the .NET 8 SDK, Git, the WebView2 runtime.
-2. **Restores your data** from the Google Drive backup if this PC has none. It only fills in missing
-   files and never overwrites anything. If the backup is configured but Drive isn't signed in yet, it
-   stops rather than starting with empty data (which the nightly backup could then copy over the real
-   one). Run it with `-Fresh` to start empty on purpose.
-3. Builds the tracker's Python environment and models if they're missing or broken. The only thing it
-   ever deletes is a `tracker\.venv` that no longer runs, and it rebuilds that.
-4. Builds the app (`-Rebuild` forces it), starts the cams, the tracker and the tray icon (through the
-   Wallpaper Manager if it's in the parent folder), pins the tray icon to the taskbar, and checks you're
-   signed in to GitHub for the nightly results.
-
-**By hand**, the same steps. Requirements:
-- Windows 10 or 11
-- [.NET 8 SDK](https://dotnet.microsoft.com/download) to build the app
-- WebView2 Runtime (preinstalled on Windows 11)
-- Python 3.12 for the tracker
-- Optional: an Intel integrated GPU for the tracker's models
-
-```powershell
-git clone https://github.com/joshuafrommeyer-35/PierTracker.git
-cd PierTracker
-
-# 1. Build the wallpaper app into .\app
-dotnet publish host -c Release -o app
-
-# 2. Tracker environment (CPU-only PyTorch first so nothing pulls a CUDA build)
-py -3.12 -m venv tracker\.venv
-tracker\.venv\Scripts\pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
-tracker\.venv\Scripts\pip install -r tracker\requirements-setup.txt -r tracker\requirements-ml.txt
-
-# 3. Download and convert the models (about 1.9 GB download, 2-3 minutes)
-tracker\.venv\Scripts\python tracker\setup_models.py
-
-# 4. Check livecams.json: monitors are numbered left to right. Then start it:
-app\LiveCams.exe --on
-```
-
-Re-run `setup_models.py` after editing `tracker/species.json`. To publish results to your own fork, set
-`"publishResults": true` in `livecams.json`. It commits and pushes with your normal git credentials.
-
-## Usage
-
-| Do this | What happens |
-|---|---|
-| `app\LiveCams.exe --on` | Cams and tracker start, and start again at every login |
-| `app\LiveCams.exe --off` | Each monitor freezes on its current cam picture (saved as a normal Windows wallpaper), then everything shuts down. Nothing keeps running. Removes the login start |
-| `app\LiveCams.exe --quit` | Shuts down without freezing; your normal wallpaper comes back |
-| Click the empty desktop on a cam's monitor | Resumes that cam, or reloads it if it's broken. On the underwater monitor: go live again |
-| Tray icon (wave) | Status on hover. Menu: review uncertain sightings, **pause cams + tracker** (for demanding games), resume a cam, reload, open the folder, turn off. Double-click resumes everything. An amber dot means sightings are waiting for review; grey means paused |
-| `app\LiveCams.exe --relaunch` | Restart it (e.g. after an update), keeping the start-at-login setting and any pause |
-| `app\LiveCams.exe --pause` / `--resume` | Pause: each monitor keeps a still, the cams unload and the tracker stops (its memory is freed). It stays paused, across restarts too, until resumed (or `--on`). Full-screen games already pause the cams automatically; this makes sure, e.g. for a game in a borderless window |
-| `app\LiveCams.exe --review` | The review window on its own, even while the cams are off |
-
-### Reviewing uncertain sightings
-
-**Reminder.** While sightings are waiting, the tray icon has an amber dot and its tooltip gives the
-count. At most once a day, when 10 or more are waiting, a Windows notification says so; clicking it
-opens the review window. It only appears while you're using the PC, never during a game or other
-full-screen app or in the first 15 minutes after login, and Windows' Do Not Disturb silences it.
-
-Tray icon → **Review uncertain sightings (N)...** shows each saved picture: the close-up on the left, and
-where it was in the frame on the right. The bottom line shows how many answers each animal has toward the
-camera-trained classifier. The top line says which kind it is:
-- **"The tracker wasn't sure. Is it one of these?"**
-- **"The tracker logged this as a ___. Is that right?"** Press `1` if it's right. Otherwise pick the
-  right animal, or press `N`.
-
-| Key | Action |
-|---|---|
-| `1` `2` `3` | It's the tracker's 1st, 2nd or 3rd guess |
-| Pick from the list → **Approve as this** | It's a different animal. The list ends with the look-alike groups ("group: silversides & sardines") for when you can tell the kind of fish but not the species |
-| `N` | Not an animal |
-| `S` or `→` | Skip for now |
-| `C` | Copy the picture, to paste into a chat or iNaturalist when you want help with the ID (skip it meanwhile; it stays in the queue) |
-
-Some cards show a **Suggestion** line (for example from Claude going through the queue): a second opinion
-with the reason, never applied by itself.
-
-**Compare panel (right).** Each guess, the suggestion, and whatever you pick from the list is shown with
-three typical reference photos and a line on how to tell it apart ("black spot at the base of the tail").
-The photos are the research-grade iNaturalist reference photos the tracker already keeps locally, chosen
-as the most typical underwater ones of each species (`reference_photos.py examples`). Blacksmith leads with
-a young one, since those are what this camera sees most. Click a photo to open it full size. The notes are
-in [`tracker/field_marks.json`](tracker/field_marks.json). If you still can't tell, skip: a wrong answer
-teaches the tracker the wrong thing, and a skipped one costs nothing.
-
-Each answer records who gave it (`reviewer`: `person`, or `claude` for structure, empty water and clear
-lobster pictures checked by eye). Only a person's answers count toward the published **Checked** and
-**Confirmed by hand**; all answers teach the tracker. An answer to an "Is this right?" picture also
-**corrects the sighting it came from**: the database keeps the logged name and adds the corrected one
-(`corrected_name`, empty for "not an animal"), and the statistics use the correction.
-
-Decisions go to `data/review/decisions.csv`, and the pictures move to `data/review/approved` or
-`data/review/rejected`. The next daily publish lists confirmed animals under **Confirmed by hand**.
-
-### `livecams.json`
-
-| Setting | Meaning |
-|---|---|
-| `cams[].monitor` | Monitor number, counted left to right |
-| `cams[].page` / `iframe` | The official page, and the CSS selector of its player |
-| `cams[].extraBottomPx` | Pushes a toolbar under the video off-screen (Surfline: 40) |
-| `cams[].mode` | `alwaysOn` (keep streaming) or `resumeWhenWatched` (follow the player's own pause) |
-| `cams[].freezeDisplayAfterSeconds` | Freeze the on-screen picture after this long, while the stream keeps running |
-| `cams[].captureEverySeconds` / `captureDir` | Save a frame for the tracker this often |
-| `watchedIdleSeconds` / `coverThreshold` | What counts as "someone is looking" |
-| `pauseDuringFullscreenApps` | Unload the cams during games and other full-screen apps |
-| `notGames` | Full-screen programs that don't pause the cams (default: browsers, so watching the cam itself full-screen doesn't blind the tracker) |
-| `reviewReminderHours` / `reviewReminderMinPending` | Review notification at most this often (default 24 h; 0 = tray dot only), and only with at least this many waiting (default 10) |
-| `tracker.enabled` / `publishResults` | Run the tracker; push daily results to GitHub |
-| `tracker.backupDir` | Folder for the nightly backup (e.g. on Google Drive); leave out for none |
-| `debugPort` | Troubleshooting only (Chrome DevTools on localhost). Keep at 0 |
-
-### Files it writes (local only, not committed)
-
-| Path | Contents |
-|---|---|
-| `data/piertracker.db` | **Everything the tracker saw** (SQLite): snapshots, sightings, visits, species, conditions, reviews |
-| `data/crops/<date>/` | Sample crops for validation (kept 14 days) |
-| Google Drive `PierTracker backup/` | Nightly copy of the database, review answers, CSVs and the whole frame bank (`tracker.backupDir` in `livecams.json`). Each file is copied under a temporary name and swapped in, so an interrupted backup leaves the previous one whole, and a PC with less data than the backup (a fresh install that wasn't restored) never overwrites it |
-| `data/background.png` | The long-term background (median of the last hour of clear daylight) that fixed, swaying things are compared with |
-| `data/fixture_gallery.npz` | Person-confirmed fixtures and animals (from review answers), with where they were |
-| `data/frame_bank/<date>/` | Sample full frames kept for training a detector on this camera later (90 days, ~20 MB/day) |
-| `data/review/` | Review pictures: `pending/`, `approved/`, `rejected/` and `decisions.csv` |
-| `sandbox/piertracker_sandbox.db` | Your practice copy (`sql.py`, `.reset` to refresh) |
-| `data/environment_hourly.csv` | Hourly conditions at the pier (NOAA + SCCOOS), temperature anomaly, El Niño index |
-| `data/ml/classifier_report.md` | Latest camera-classifier training report |
-| `logs/nightly.log` | What the nightly job did |
-| `frames/` | The latest tracker frame, and the stills used by `--off` |
-| `frames/underwater/recent/` | The last 10 minutes of frames, with what was ignored as fixed structure in each (to check "did it see that?") |
-| `data/archive/` | Earlier data set aside, never deleted: pre-tuning runs, the CSV logs used before the database, removed fixture sightings |
-| `logs/host.log`, `logs/tracker.log` | What the app and tracker did |
-
-## Project layout
-
-```
-host/                 LiveCams wallpaper app (C#, .NET 8, WebView2)
-tracker/
-  tracker.py          the background tracker
-  setup_models.py     one-time model download + OpenVINO conversion
-  environment.py      hourly conditions at the pier (NOAA tide gauge + SCCOOS shore station),
-                      temperature anomaly and El Nino index
-  nightly.py          once-a-day job: conditions, database sync, retraining, conditions model, publish
-  db.py               the SQLite database (schema, recording, sync, sandbox copy)
-  sql.py              small SQL shell for practicing on the sandbox
-  ml/
-    train_classifier.py  camera-trained classifier from review answers
-    conditions_model.py  "what brings animals in" regressions
-  publish_results.py  daily README/results update
-  species.json        the animals it can name (edit to taste)
-results/              published summaries: daily, hourly sightings, hourly conditions,
-                      validation, confirmed by hand
-livecams.json         configuration
-setup.ps1             set up and start (run by "Set up and start LiveCams.bat")
-tests/                automated tests (python -m pytest tests); run on GitHub for every code change
-community/            community IDs: viewers click a box and say what it is (built, not public yet:
-                      docs/COMMUNITY.md)
-```
+| Review uncertain sightings | Confirm or correct what the tracker wasn't sure of, with reference photos side by side |
+| Rewind the underwater cam | Play back the kept video by the clock: jump to a time, step frame by frame, keep a clip or a picture |
+| Just saw something? Keep the last 5 minutes | Keeps them for good and opens the rewind window a minute back |
+| Pause cams + tracker | For demanding games (full-screen games pause everything by themselves) |
+| Turn off | Freezes each monitor on its current picture and stops everything |
+
+The command line and every setting: [setup and use](docs/SETUP_AND_USE.md).
 
 ## How this was built
 
@@ -927,15 +234,15 @@ PierTracker is Joshua Frommeyer's project. The idea, the questions it asks (what
 how that changes with water temperature, turbidity, tides and this year's El Niño), and the decisions
 about what counts, how it's checked and what gets published come from Joshua. The code was written with
 Claude, which is why the commits list Claude as a co-author. Uncertain identifications go to a person,
-and the validation and caveats in this README are there because a model's guesses aren't taken on trust.
+and the validation and caveats here are there because a model's guesses aren't taken on trust.
 
 ## Credits
 
 - **Cams:** [Scripps Institution of Oceanography](https://scripps.ucsd.edu/piercam) (UC San Diego). The
   underwater cam is run by Scripps' [Coastal Ocean Observing Lab](https://coollab.ucsd.edu/pierviz/) and
   streamed by [HDOnTap](https://hdontap.com/). The pier cam is by [Surfline](https://www.surfline.com/).
-  This project only displays their official players. Frames are analyzed on the local PC and never
-  uploaded, and only summary numbers are published.
+  This project only displays their official players. Frames and video stay on the local PC (the video
+  is deleted after about two days unless a clip is kept) and only summary numbers are published.
 - **Models:**
   - [Community Fish Detector](https://github.com/filippovarini/community-fish-detector) (Apache-2.0)
     on [RF-DETR](https://github.com/roboflow/rf-detr) (Apache-2.0)
@@ -947,7 +254,8 @@ and the validation and caveats in this README are there because a model's guesse
   - SCCOOS Automated Shore Station, Scripps Pier, served by CeNCOOS. Free to use and redistribute; please
     credit CeNCOOS and NOAA. Not for legal use; the providers give no warranty.
 - **Runtime:** [OpenVINO](https://github.com/openvinotoolkit/openvino) (Apache-2.0),
-  [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/).
+  [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), and
+  [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0, bundled in `host/viewer/`) to play back the kept video.
 
 ## License
 
