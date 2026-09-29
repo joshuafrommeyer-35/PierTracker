@@ -43,7 +43,7 @@ These are built and switch themselves on; they only need time or answers.
 - **Frames every 2 s and the rewind video (from 2026-09-28):** the first daylight day. Check that the frames
   between snapshots stay within their 15 min/hour of model time and catch real passers-by (`between snapshots`
   lines in `logs/tracker.log`), tune the 30% solidity bar if schools set it off constantly, measure the daytime
-  CPU cost of the extra frame grabs, and check the rewind window's clock against the tracker's frames in daylight.
+  CPU cost (night: 0.55% of one core), and check the rewind window's clock against the tracker's frames in daylight.
 
 - **First unattended nightly run** (10 pm 2026-09-25, started by LiveCams itself, so it runs while
   paused): results publish and the Google Drive backup.

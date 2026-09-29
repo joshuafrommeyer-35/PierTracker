@@ -354,10 +354,10 @@ Measured on the machine this runs on: i7-13700K, Radeon RX 7800 XT, Intel UHD 77
 | Turned off (`--off`) | nothing running | none | 0 |
 
 Since 2026-09-28 (the rows above were measured before):
-- **A frame every 2 s** instead of every 10 s. At night, with a frame every 10 s, everything together
-  used 0.2% of one core (0.01% of total CPU). The frames in between cost the tracker a motion check each
-  (no model) and at most 15 minutes of Intel iGPU time per hour when something new moves. Their daytime
-  CPU cost is to be measured.
+- **A frame every 2 s** instead of every 10 s. Measured at night (cams live, tracker skipping dark
+  frames), everything together used 0.55% of one core (0.02% of total CPU), up from 0.23% with a frame
+  every 10 s. In daylight the frames in between also cost the tracker a motion check each (no model),
+  and at most 15 minutes of Intel iGPU time per hour when something new moves.
 - **Video kept for rewinding:** a copy of what the player already downloads, with no decoding or
   re-encoding: ~0.6 MB/s written to disk in daylight, about 26 GB a day, deleted after about two days.
 
