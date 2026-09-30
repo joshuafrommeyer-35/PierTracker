@@ -17,15 +17,15 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-09-28 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-28 22:00:25.
+_Last updated 2026-09-29 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-09-29 22:00:27.
 
 | | |
 |---|---|
-| Days tracked | 4 |
-| Snapshots analyzed (one every 10 s while streaming) | 9,600 |
-| Clear-water daylight footage analyzed | 17.3 h |
+| Days tracked | 5 |
+| Snapshots analyzed (one every 10 s while streaming) | 18,216 |
+| Clear-water daylight footage analyzed | 29.7 h |
 | Daylight too murky to identify anything | 0.0 h |
-| Animal types seen repeatedly or confirmed | 29 |
+| Animal types seen repeatedly or confirmed | 31 |
 
 ### Animals seen
 
@@ -38,42 +38,45 @@ _Last updated 2026-09-28 22:00 (Pacific). Tracking since 2026-09-25._ Last frame
 - **Snapshots**: how many snapshots (one every 10 s) it was in, i.e. how long it was around.
   The frames in between (every 2 s) catch animals that pass quickly: those count as encounters.
 
-Names come from BioCLIP 2.5, a general model of living things. A classifier trained on this camera's own pictures takes over each animal once it has 12+ review answers (retrained nightly, and used only where it beats BioCLIP). None has enough yet: 65 answers so far, and blacksmith is closest with 11. **Checked**: how many of the names a person has checked, and how many were right. Listed: animals a person confirmed or seen repeatedly (10+ snapshots or 3+ encounters). Sightings found wrong by checking the pictures are corrected.
+Names come from BioCLIP 2.5, a general model of living things. A classifier trained on this camera's own pictures takes over each animal once it has 12+ review answers (retrained nightly, and used only where it beats BioCLIP). So far 2 have enough (blacksmith, kelp bass), from 84 answers. **Checked**: how many of the names a person has checked, and how many were right. Listed: animals a person confirmed or seen repeatedly (10+ snapshots or 3+ encounters). Sightings found wrong by checking the pictures are corrected.
 
 | Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | — | 2,537 | 40.71% | 600 | 4 | 2026-09-25 | 2026-09-28 | — |
-| fish (unidentified) | fish | — | 821 | 13.17% | 4 | 4 | 2026-09-25 | 2026-09-28 | — |
-| blacksmith | fish | 12 | 459 | 7.37% | 4 | 4 | 2026-09-25 | 2026-09-28 | 3 of 3 right |
-| California spiny lobster | invertebrate | 12 | 374 | 6.00% | 1 | 4 | 2026-09-25 | 2026-09-28 | not yet |
-| kelp bass | fish | 11 | 150 | 2.41% | 2 | 4 | 2026-09-25 | 2026-09-28 | not yet |
-| silversides & sardines | fish | 11 | 108 | 1.73% | 4 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| salema | fish | 12 | 73 | 1.17% | 4 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
-| sea basses | fish | 4 | 43 | 0.69% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
-| Pacific sardine | fish | 13 | 41 | 0.66% | 2 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| blacksmith (school) | fish | 5 | 40 | 0.64% | 9 | 3 | 2026-09-25 | 2026-09-28 | 3 of 3 right |
-| fish (unidentified) (school) | fish | — | 34 | 0.55% | 9 | 4 | 2026-09-25 | 2026-09-28 | — |
-| rays | shark/ray | 9 | 30 | 0.48% | 1 | 3 | 2026-09-26 | 2026-09-28 | not yet |
-| bat ray | shark/ray | 5 | 29 | 0.47% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| jack mackerel | fish | 8 | 29 | 0.47% | 1 | 3 | 2026-09-26 | 2026-09-28 | not yet |
-| wrasses (senorita, sheephead) | fish | 11 | 28 | 0.45% | 2 | 3 | 2026-09-26 | 2026-09-28 | not yet |
-| rock wrasse | fish | 5 | 22 | 0.35% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
-| jacksmelt | fish | 8 | 20 | 0.32% | 2 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
-| damselfishes (garibaldi, blacksmith) | fish | 8 | 14 | 0.22% | 3 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| diamond stingray | shark/ray | 9 | 12 | 0.19% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
-| giant kelpfish | fish | 7 | 9 | 0.14% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| opaleye | fish | 6 | 9 | 0.14% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| grunts (salema, sargo) | fish | 5 | 8 | 0.13% | 1 | 2 | 2026-09-25 | 2026-09-28 | not yet |
-| mackerels & bonito | fish | 6 | 7 | 0.11% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
-| yellowtail amberjack | fish | 4 | 7 | 0.11% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
-| topsmelt | fish | 3 | 4 | 0.06% | 1 | 3 | 2026-09-25 | 2026-09-27 | not yet |
-| queenfish | fish | 4 | 4 | 0.06% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
-| garibaldi | fish | 3 | 3 | 0.05% | 1 | 2 | 2026-09-25 | 2026-09-28 | not yet |
-| sargo | fish | 3 | 3 | 0.05% | 1 | 2 | 2026-09-25 | 2026-09-28 | 0 of 1 right |
-| black sea nettle jellyfish | invertebrate | 3 | 3 | 0.05% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
-| sheep crab | invertebrate | 3 | 3 | 0.05% | 1 | 2 | 2026-09-27 | 2026-09-28 | not yet |
-| salema (school) | fish | 2 | 2 | 0.03% | 5 | 2 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
-| barred sand bass | fish | 1 | 1 | 0.02% | 1 | 1 | 2026-09-25 | 2026-09-25 | 1 of 1 right |
+| small fish (school) | fish | — | 2,679 | 25.09% | 600 | 5 | 2026-09-25 | 2026-09-29 | — |
+| California spiny lobster | invertebrate | 14 | 1,052 | 9.85% | 1 | 5 | 2026-09-25 | 2026-09-29 | not yet |
+| fish (unidentified) | fish | — | 1,043 | 9.77% | 4 | 5 | 2026-09-25 | 2026-09-29 | — |
+| blacksmith | fish | 12 | 459 | 4.30% | 4 | 4 | 2026-09-25 | 2026-09-28 | 6 of 6 right |
+| kelp bass | fish | 12 | 158 | 1.48% | 2 | 5 | 2026-09-25 | 2026-09-29 | 12 of 12 right |
+| sea basses | fish | 6 | 125 | 1.17% | 1 | 3 | 2026-09-27 | 2026-09-29 | not yet |
+| silversides & sardines | fish | 13 | 110 | 1.03% | 4 | 4 | 2026-09-25 | 2026-09-29 | not yet |
+| salema | fish | 12 | 73 | 0.68% | 4 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| rays | shark/ray | 16 | 45 | 0.42% | 1 | 4 | 2026-09-26 | 2026-09-29 | not yet |
+| fish (unidentified) (school) | fish | — | 43 | 0.40% | 12 | 5 | 2026-09-25 | 2026-09-29 | — |
+| bat ray | shark/ray | 10 | 42 | 0.39% | 1 | 4 | 2026-09-25 | 2026-09-29 | not yet |
+| Pacific sardine | fish | 13 | 41 | 0.38% | 2 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| blacksmith (school) | fish | 5 | 40 | 0.37% | 9 | 3 | 2026-09-25 | 2026-09-28 | 6 of 6 right |
+| wrasses (senorita, sheephead) | fish | 15 | 36 | 0.34% | 2 | 4 | 2026-09-26 | 2026-09-29 | not yet |
+| jack mackerel | fish | 10 | 29 | 0.27% | 1 | 4 | 2026-09-26 | 2026-09-29 | not yet |
+| rock wrasse | fish | 6 | 22 | 0.21% | 1 | 3 | 2026-09-26 | 2026-09-29 | not yet |
+| jacksmelt | fish | 8 | 20 | 0.19% | 2 | 3 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| damselfishes (garibaldi, blacksmith) | fish | 11 | 19 | 0.18% | 3 | 4 | 2026-09-25 | 2026-09-29 | not yet |
+| diamond stingray | shark/ray | 10 | 14 | 0.13% | 1 | 3 | 2026-09-27 | 2026-09-29 | not yet |
+| grunts (salema, sargo) | fish | 6 | 11 | 0.10% | 2 | 3 | 2026-09-25 | 2026-09-29 | not yet |
+| sheep crab | invertebrate | 7 | 10 | 0.09% | 1 | 3 | 2026-09-27 | 2026-09-29 | not yet |
+| giant kelpfish | fish | 7 | 9 | 0.08% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| opaleye | fish | 6 | 9 | 0.08% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| mackerels & bonito | fish | 6 | 7 | 0.07% | 1 | 3 | 2026-09-25 | 2026-09-28 | not yet |
+| yellowtail amberjack | fish | 4 | 7 | 0.07% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| octopus | invertebrate | 7 | 7 | 0.07% | 1 | 1 | 2026-09-29 | 2026-09-29 | not yet |
+| topsmelt | fish | 3 | 4 | 0.04% | 1 | 3 | 2026-09-25 | 2026-09-27 | not yet |
+| queenfish | fish | 5 | 4 | 0.04% | 1 | 3 | 2026-09-26 | 2026-09-29 | not yet |
+| garibaldi | fish | 3 | 3 | 0.03% | 1 | 2 | 2026-09-25 | 2026-09-28 | not yet |
+| sargo | fish | 3 | 3 | 0.03% | 1 | 2 | 2026-09-25 | 2026-09-28 | 0 of 1 right |
+| black sea nettle jellyfish | invertebrate | 3 | 3 | 0.03% | 1 | 2 | 2026-09-26 | 2026-09-28 | not yet |
+| surfperches | fish | 3 | 3 | 0.03% | 2 | 2 | 2026-09-28 | 2026-09-29 | not yet |
+| salema (school) | fish | 2 | 2 | 0.02% | 5 | 2 | 2026-09-25 | 2026-09-28 | 1 of 1 right |
+| barred sand bass | fish | 1 | 1 | 0.01% | 1 | 1 | 2026-09-25 | 2026-09-25 | 1 of 1 right |
+| small fish | fish | — | 1 | 0.01% | 1 | 1 | 2026-09-29 | 2026-09-29 | — |
 
 <details><summary>Seen briefly and not yet checked: 22 more names</summary>
 
@@ -82,28 +85,28 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 
 | Animal | Encounters | Snapshots | First seen | Last seen |
 |---|---:|---:|---|---|
+| jellyfish | 2 | 3 | 2026-09-28 | 2026-09-29 |
+| croakers | 2 | 2 | 2026-09-25 | 2026-09-29 |
 | Pacific chub mackerel | 2 | 2 | 2026-09-25 | 2026-09-26 |
 | Pacific barracuda | 2 | 2 | 2026-09-25 | 2026-09-26 |
 | pile perch | 2 | 2 | 2026-09-25 | 2026-09-28 |
 | bullseye pufferfish | 2 | 2 | 2026-09-26 | 2026-09-28 |
 | shiner perch | 1 | 2 | 2026-09-26 | 2026-09-26 |
+| sharks | 2 | 2 | 2026-09-27 | 2026-09-29 |
+| sea chubs (opaleye, halfmoon) | 2 | 2 | 2026-09-28 | 2026-09-29 |
 | senorita | 2 | 2 | 2026-09-28 | 2026-09-28 |
 | zebra-perch sea chub | 2 | 2 | 2026-09-28 | 2026-09-28 |
-| jellyfish | 1 | 2 | 2026-09-28 | 2026-09-28 |
+| leopard shark | 2 | 2 | 2026-09-28 | 2026-09-29 |
 | market squid | 2 | 2 | 2026-09-28 | 2026-09-28 |
 | halfmoon | 1 | 1 | 2026-09-25 | 2026-09-25 |
 | silversides & sardines (school) | 1 | 1 | 2026-09-25 | 2026-09-25 |
-| croakers | 1 | 1 | 2026-09-25 | 2026-09-25 |
 | California scorpionfish | 1 | 1 | 2026-09-25 | 2026-09-25 |
 | Pacific bonito | 1 | 1 | 2026-09-25 | 2026-09-25 |
 | finescale triggerfish | 1 | 1 | 2026-09-25 | 2026-09-25 |
 | spotfin croaker | 1 | 1 | 2026-09-26 | 2026-09-26 |
 | shovelnose guitarfish | 1 | 1 | 2026-09-27 | 2026-09-27 |
-| sharks | 1 | 1 | 2026-09-27 | 2026-09-27 |
-| sea chubs (opaleye, halfmoon) | 1 | 1 | 2026-09-28 | 2026-09-28 |
-| surfperches | 1 | 1 | 2026-09-28 | 2026-09-28 |
-| leopard shark | 1 | 1 | 2026-09-28 | 2026-09-28 |
 | purple-striped jellyfish | 1 | 1 | 2026-09-28 | 2026-09-28 |
+| flatfishes | 1 | 1 | 2026-09-29 | 2026-09-29 |
 
 </details>
 
@@ -113,9 +116,9 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 
 ```mermaid
 xychart-beta
-    x-axis ["09-25", "09-26", "09-27", "09-28"]
+    x-axis ["09-25", "09-26", "09-27", "09-28", "09-29"]
     y-axis "Animal snapshots"
-    bar [1374, 1465, 226, 1893]
+    bar [1374, 1465, 226, 1893, 1212]
 ```
 
 #### When animals show up (all days, Pacific time)
@@ -124,7 +127,7 @@ xychart-beta
 xychart-beta
     x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 13, 161, 302, 345, 963, 1074, 815, 449, 336, 299, 119, 40, 42, 0, 0, 0, 0, 0]
+    bar [0, 0, 0, 0, 0, 0, 37, 226, 365, 444, 1076, 1200, 905, 512, 549, 467, 237, 72, 80, 0, 0, 0, 0, 0]
 ```
 
 </details>
@@ -133,17 +136,17 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-09-28:** water 22.7 °C at ~5 m, **+2.8 °C** vs. normal for the date. Turbidity 0.57 NTU, chlorophyll 0.53 µg/L. El Niño index **+1.8** (El Niño).
+**2026-09-29:** water 21.4 °C at ~5 m, **+1.6 °C** vs. normal for the date. Turbidity 1.24 NTU, chlorophyll 0.74 µg/L. El Niño index **+1.8** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["09-25", "09-26", "09-27", "09-28"]
+    x-axis ["09-25", "09-26", "09-27", "09-28", "09-29"]
     y-axis "°C" 18 --> 24
-    line [22.76, 22.13, 22.53, 22.73]
-    line [20.12, 20.06, 20.0, 19.94]
+    line [22.76, 22.13, 22.53, 22.78, 21.43]
+    line [20.12, 20.06, 20.0, 19.94, 19.86]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
@@ -153,7 +156,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-09-25 | 22.8 | +2.6 | 0.28 | 0.50 | 33.44 | 7.25 | 7.97 | 1.57 | 1,374 |
 | 2026-09-26 | 22.1 | +2.1 | 0.24 | 0.47 | 33.43 | 7.26 | 7.96 | 1.52 | 1,465 |
 | 2026-09-27 | 22.5 | +2.5 | 0.35 | 0.55 | 33.44 | 7.20 | 7.96 | 1.69 | 226 |
-| 2026-09-28 | 22.7 | +2.8 | 0.57 | 0.53 | 33.46 | 7.12 | 7.96 | 1.70 | 1,893 |
+| 2026-09-28 | 22.8 | +2.8 | 0.56 | 0.52 | 33.46 | 7.12 | 7.96 | 1.80 | 1,893 |
+| 2026-09-29 | 21.4 | +1.6 | 1.24 | 0.74 | 33.43 | 7.26 | 7.96 | 1.53 | 1,212 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
@@ -161,20 +165,22 @@ Sources: SCCOOS shore station on the pier (water; quality-controlled readings on
 
 ### Confirmed by hand
 
-Sightings the tracker wasn't sure about are saved for review. These were checked by a person: 8 confirmed as the animal below, 0 rejected (not an animal). They are listed here separately and not added to the counts above.
+Sightings the tracker wasn't sure about are saved for review. These were checked by a person: 12 confirmed as the animal below, 0 rejected (not an animal). They are listed here separately and not added to the counts above.
 
 | Animal | Confirmed | Last confirmed |
 |---|---:|---|
-| blacksmith | 7 | 2026-09-25 |
+| blacksmith | 10 | 2026-09-25 |
 | salema | 1 | 2026-09-25 |
+| kelp bass | 1 | 2026-09-25 |
 
 ### Validation (hand-checked samples)
 
-8 of the tracker's names checked by a person so far; 75% were named correctly.
+23 of the tracker's names checked by a person so far; 91% were named correctly.
 
 | Animal | Checked | Correct | Precision |
 |---|---:|---:|---:|
-| blacksmith | 3 | 3 | 100% |
+| kelp bass | 12 | 12 | 100% |
+| blacksmith | 6 | 6 | 100% |
 | sargo | 1 | 0 | 0% |
 | barred sand bass | 1 | 1 | 100% |
 | jacksmelt | 1 | 1 | 100% |

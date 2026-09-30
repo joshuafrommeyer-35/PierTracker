@@ -346,4 +346,110 @@ date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,common_name,snapshot
 2026-09-28,19,40,40,0,,0,0
 2026-09-28,20,293,293,0,,0,0
 2026-09-28,21,88,88,0,,0,0
-2026-09-28,22,3,3,0,,0,0
+2026-09-28,22,360,360,0,,0,0
+2026-09-28,23,360,360,0,,0,0
+2026-09-29,0,360,360,0,,0,0
+2026-09-29,1,360,360,0,,0,0
+2026-09-29,2,360,360,0,,0,0
+2026-09-29,3,360,360,0,,0,0
+2026-09-29,4,360,360,0,,0,0
+2026-09-29,5,360,360,0,,0,0
+2026-09-29,6,360,169,0,California spiny lobster,10,1
+2026-09-29,6,360,169,0,bat ray,1,1
+2026-09-29,6,360,169,0,fish (unidentified),12,1
+2026-09-29,6,360,169,0,octopus,0,1
+2026-09-29,6,360,169,0,rays,1,1
+2026-09-29,7,360,0,0,California spiny lobster,20,1
+2026-09-29,7,360,0,0,bat ray,2,1
+2026-09-29,7,360,0,0,fish (unidentified),19,4
+2026-09-29,7,360,0,0,jack mackerel,0,1
+2026-09-29,7,360,0,0,rays,2,1
+2026-09-29,7,360,0,0,rock wrasse,0,1
+2026-09-29,7,360,0,0,sheep crab,1,1
+2026-09-29,7,360,0,0,small fish (school),20,150
+2026-09-29,7,360,0,0,"wrasses (senorita, sheephead)",1,1
+2026-09-29,8,359,0,0,California spiny lobster,14,1
+2026-09-29,8,359,0,0,bat ray,4,1
+2026-09-29,8,359,0,0,fish (unidentified),16,3
+2026-09-29,8,359,0,0,fish (unidentified) (school),2,7
+2026-09-29,8,359,0,0,flatfishes,1,1
+2026-09-29,8,359,0,0,jellyfish,1,1
+2026-09-29,8,359,0,0,octopus,1,1
+2026-09-29,8,359,0,0,rays,2,1
+2026-09-29,8,359,0,0,small fish (school),22,100
+2026-09-29,9,359,0,0,California spiny lobster,78,1
+2026-09-29,9,359,0,0,bat ray,3,1
+2026-09-29,9,359,0,0,fish (unidentified),13,2
+2026-09-29,9,359,0,0,rays,1,1
+2026-09-29,9,359,0,0,sheep crab,3,1
+2026-09-29,9,359,0,0,small fish (school),1,60
+2026-09-29,10,358,0,0,California spiny lobster,80,1
+2026-09-29,10,358,0,0,bat ray,1,1
+2026-09-29,10,358,0,0,diamond stingray,2,1
+2026-09-29,10,358,0,0,fish (unidentified),16,3
+2026-09-29,10,358,0,0,fish (unidentified) (school),1,12
+2026-09-29,10,358,0,0,jack mackerel,0,1
+2026-09-29,10,358,0,0,octopus,2,1
+2026-09-29,10,358,0,0,queenfish,0,1
+2026-09-29,10,358,0,0,rays,2,1
+2026-09-29,10,358,0,0,small fish (school),9,80
+2026-09-29,11,360,0,0,California spiny lobster,86,1
+2026-09-29,11,360,0,0,"damselfishes (garibaldi, blacksmith)",1,1
+2026-09-29,11,360,0,0,fish (unidentified),24,2
+2026-09-29,11,360,0,0,octopus,1,1
+2026-09-29,11,360,0,0,rays,3,1
+2026-09-29,11,360,0,0,"sea chubs (opaleye, halfmoon)",1,1
+2026-09-29,11,360,0,0,silversides & sardines,1,2
+2026-09-29,11,360,0,0,small fish (school),8,50
+2026-09-29,11,360,0,0,"wrasses (senorita, sheephead)",1,1
+2026-09-29,12,360,0,0,California spiny lobster,64,1
+2026-09-29,12,360,0,0,fish (unidentified),18,1
+2026-09-29,12,360,0,0,fish (unidentified) (school),1,7
+2026-09-29,12,360,0,0,small fish (school),7,70
+2026-09-29,13,360,0,0,California spiny lobster,34,1
+2026-09-29,13,360,0,0,croakers,1,1
+2026-09-29,13,360,0,0,fish (unidentified),17,1
+2026-09-29,13,360,0,0,octopus,1,1
+2026-09-29,13,360,0,0,rays,1,1
+2026-09-29,13,360,0,0,sheep crab,1,1
+2026-09-29,13,360,0,0,small fish (school),7,60
+2026-09-29,13,360,0,0,surfperches,1,1
+2026-09-29,14,360,0,0,California spiny lobster,148,1
+2026-09-29,14,360,0,0,"damselfishes (garibaldi, blacksmith)",3,1
+2026-09-29,14,360,0,0,fish (unidentified),29,4
+2026-09-29,14,360,0,0,fish (unidentified) (school),2,5
+2026-09-29,14,360,0,0,silversides & sardines,1,1
+2026-09-29,14,360,0,0,small fish (school),26,80
+2026-09-29,14,360,0,0,surfperches,1,2
+2026-09-29,14,360,0,0,"wrasses (senorita, sheephead)",3,1
+2026-09-29,15,360,0,0,California spiny lobster,112,1
+2026-09-29,15,360,0,0,fish (unidentified),28,4
+2026-09-29,15,360,0,0,fish (unidentified) (school),2,5
+2026-09-29,15,360,0,0,octopus,1,1
+2026-09-29,15,360,0,0,sheep crab,2,1
+2026-09-29,15,360,0,0,small fish (school),22,150
+2026-09-29,15,360,0,0,"wrasses (senorita, sheephead)",1,1
+2026-09-29,16,359,0,0,California spiny lobster,32,1
+2026-09-29,16,359,0,0,bat ray,2,1
+2026-09-29,16,359,0,0,"damselfishes (garibaldi, blacksmith)",1,1
+2026-09-29,16,359,0,0,fish (unidentified),15,2
+2026-09-29,16,359,0,0,fish (unidentified) (school),1,5
+2026-09-29,16,359,0,0,"grunts (salema, sargo)",3,2
+2026-09-29,16,359,0,0,kelp bass,8,1
+2026-09-29,16,359,0,0,rays,3,1
+2026-09-29,16,359,0,0,sea basses,31,1
+2026-09-29,16,359,0,0,sharks,1,1
+2026-09-29,16,359,0,0,small fish,1,1
+2026-09-29,16,359,0,0,small fish (school),18,100
+2026-09-29,16,359,0,0,"wrasses (senorita, sheephead)",2,1
+2026-09-29,17,349,0,0,fish (unidentified),8,2
+2026-09-29,17,349,0,0,sea basses,22,1
+2026-09-29,17,349,0,0,small fish (school),2,30
+2026-09-29,18,360,48,0,fish (unidentified),7,2
+2026-09-29,18,360,48,0,leopard shark,1,1
+2026-09-29,18,360,48,0,octopus,1,1
+2026-09-29,18,360,48,0,sea basses,29,1
+2026-09-29,19,360,360,0,,0,0
+2026-09-29,20,356,356,0,,0,0
+2026-09-29,21,356,356,0,,0,0
+2026-09-29,22,3,3,0,,0,0
