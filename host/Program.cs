@@ -409,7 +409,8 @@ internal sealed class LiveCamsApp : ApplicationContext
             ? "LiveCams: paused (cams + tracker). Right-click to resume."
             : gameMode
             ? "LiveCams: paused for full-screen app"
-            : string.Join("\n", windows.Select(w => $"{w.Cam.Name}: {Short(w.Status)}{(w.DisplayFrozen ? " (frozen)" : "")}"));
+            : string.Join("\n", windows.Select(w => $"{w.Cam.Name}: {Short(w.Status)}{(w.DisplayFrozen ? " (frozen)" : "")}"
+                                                     + (w.WaterClarity is { } water ? $"; water {water}" : "")));
         if (pendingReviews > 0) text += $"\n{pendingReviews} sightings to review";
         tray.Text = text.Length > 127 ? text[..127] : text;
     }

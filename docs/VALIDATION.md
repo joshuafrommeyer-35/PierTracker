@@ -291,7 +291,7 @@ which usually beats zero-shot by a wide margin on a specific camera.
 
 On 2026-09-27 at about 17:52, a person watching the cam saw an octopus jet across the screen from the right,
 in about 2 seconds. The tracker had frames at 17:52:45 and 17:52:57: open water in both, nothing moving.
-With a snapshot every 10 s, a 2-second visitor is missed about 5 times in 6. The cam's own player keeps
+With a snapshot every 12 s, a 2-second visitor is missed about 5 times in 6. The cam's own player keeps
 only the last 30 s, so the moment couldn't be watched again either. That led to two changes: frames every
 2 s, with the frames between snapshots checked for anything new and solid that moved
 ([How it works](HOW_IT_WORKS.md), step 9), and the video kept on the PC for rewinding.
@@ -312,3 +312,59 @@ the 9 "octopus" pictures in the review queue were the same kinds of thing. BioCL
 featureless patches, probably because octopuses camouflage: many photos of them show texture and little
 else. So an "octopus" from this tracker should be checked in its picture or the rewind before it's
 believed.
+## 8. Real murk: judging how far the camera can see (2026-09-29 and 30)
+
+On 2026-09-29 the water turned green and visibility dropped. The pier's sensors agree: turbidity was
+1.2–1.4 NTU all day (0.2–0.6 the day before), chlorophyll rose, and the water cooled by ~2 °C.
+
+The tracker's fine-detail score (section 3) did notice: it read ~0.7 all day, and below its "hazy"
+cutoff of 1.4 the tracker counts fish without naming them. But three things were wrong:
+- nothing published showed it: "too murky" (below 0.2, set from simulated murk) never happened;
+- the same 1.4 cutoff also put ordinary blue days in count-only mode (2026-09-30 read 1.1–1.4), when a
+  kelp bass near the camera was plain to see;
+- the score drops in dim light at dawn and dusk and rises with fish in view, so it mixes up murk with
+  other things.
+
+**A measure closer to what a diver would judge.** The camera looks down a row of pilings: a far pair on
+the left, a middle one with the crossbeam, and the nearest one on the right. In murk the far ones fade
+first. Their contrast against the open water, as a share of the water's brightness, ignores the light
+level. Against the turbidity sensor, over 42 daylight hours (rank correlation; more turbid = lower):
+
+| Measure | Correlation with turbidity |
+|---|---:|
+| Fine detail (the old score) | −0.86 |
+| Far pilings' contrast | −0.84 |
+| Middle piling's contrast | −0.81 |
+
+All three track the sensor; the pilings say what it means. Per day (daylight frames from the frame bank,
+10th / 50th / 90th percentile):
+
+| Day | Water | Far pilings | Middle piling |
+|---|---|---|---|
+| 09-25, 09-26 (95 frames) | clear | 0.30 / 0.38 / 0.44 | 0.36 / 0.49 / 0.55 |
+| 09-27, 09-28, 09-30 (182 frames) | ordinary | 0.10 / 0.22 / 0.35 | 0.23 / 0.36 / 0.56 |
+| 09-29 (97 frames) | green, murky | −0.03 / 0.07 / 0.13 | 0.09 / 0.15 / 0.29 |
+
+So: **good** with the far pilings at 0.28+, **fair** at 0.12+, **poor** when they're gone but the middle
+one shows (0.10+), **very poor** below that ([How it works](HOW_IT_WORKS.md), step 3). Applied to every
+banked daylight frame: 09-25 and 26 good, 09-27 fair, 09-28 and 30 mostly fair or good with some poor,
+09-29 mostly poor (71 frames, 12 very poor, 14 fair). A look at frames across the range matched: at
+"fair" a fish near the camera is identifiable; at "poor" the water is green fog past the first piling.
+
+**What it logged in the poor water of 09-29**, checked on its crops:
+- fish named as a look-alike group were right: every "sea basses" crop was a kelp bass;
+- the resident lobster was out on the near piling much of the day, and its legs and antennae were logged
+  as lobster, but also as "octopus", "rays", "bat ray" and "sheep crab"; and two "lobster" crops were empty
+  green water.
+
+So in poor visibility the model's own names for non-fish aren't used any more: only an animal that looks
+just like one a person confirmed at that place is logged. The camera-trained classifier doesn't name
+species there either.
+
+**Also found and fixed:** snapshots were really one every 12 s until 2026-09-28 (the "10 s" setting was
+rounded up by LiveCams' 3-second check), and 09-29 and 30 ran at 10 s after the switch to 2-second
+frames. Their extra snapshots were re-marked as frames in between (one snapshot per 12-second slot; a
+copy of the database from before is in `data/archive/`), and the published hours now use 12 s.
+
+Caveats: the cutoffs were set on these six days, only one of them murky. More murky days, and review
+answers split by clarity, will show whether "fair" water should name species as freely as "good".

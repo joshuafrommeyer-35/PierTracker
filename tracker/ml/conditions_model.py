@@ -4,7 +4,9 @@ For each animal with enough sightings, this fits a logistic regression of whethe
 seen at all in each clear daylight hour (yes/no), against the conditions below. Yes/no per hour,
 not snapshot counts: the tracker can't tell individuals apart, and one kelp bass hanging around
 the camera for an hour would otherwise look like hundreds of sightings. How much clear footage the
-hour had (effort) is a predictor too, since more looking finds more.
+hour had (effort) is a predictor too, since more looking finds more. For a species, footage in poor
+visibility doesn't count as looking: fish are counted then but not named, and counting it would make
+turbid water look like it drives every species away.
 
 The conditions:
 
@@ -25,6 +27,7 @@ lingers shows up in neighbouring hours), so the intervals are optimistic. Occupa
 GAMs are the natural next steps once there's a season of data.
 """
 
+import json
 import sys
 from contextlib import closing
 from datetime import datetime
@@ -64,12 +67,17 @@ def hourly_rows():
 def load(rows=None):
     sightings = pd.DataFrame(hourly_rows() if rows is None else rows)
     conditions = pd.read_csv(CONDITIONS)
-    if "snapshots_murky" not in sightings:
-        sightings["snapshots_murky"] = 0
-    sightings["snapshots_murky"] = sightings["snapshots_murky"].fillna(0)
-    # Effort = clear-water daylight snapshots: dark and murky ones couldn't have seen anything.
-    effort = (sightings.groupby(["date", "hour"])[["snapshots_analyzed", "snapshots_dark", "snapshots_murky"]].first()
-              .assign(daylight=lambda d: d.snapshots_analyzed - d.snapshots_dark - d.snapshots_murky)
+    for column in ("snapshots_murky", "snapshots_poor"):
+        if column not in sightings:
+            sightings[column] = 0
+        sightings[column] = sightings[column].fillna(0)
+    # Effort = clear-water daylight snapshots: dark and murky ones couldn't have seen anything. For an
+    # animal's name it's also less the poor-visibility ones, where fish are counted but not named:
+    # otherwise murky water would look like it drives every named fish away.
+    effort = (sightings.groupby(["date", "hour"])[["snapshots_analyzed", "snapshots_dark", "snapshots_murky",
+                                                   "snapshots_poor"]].first()
+              .assign(daylight=lambda d: d.snapshots_analyzed - d.snapshots_dark - d.snapshots_murky,
+                      naming=lambda d: d.daylight - d.snapshots_poor)
               .query("daylight > 0").reset_index())
     seen = sightings.dropna(subset=["common_name"]).pivot_table(
         index=["date", "hour"], columns="common_name", values="snapshots_seen", aggfunc="sum", fill_value=0)
@@ -80,16 +88,25 @@ def load(rows=None):
     return table, [c for c in seen.columns]
 
 
+def logged_in_poor_water(animal) -> bool:
+    """Fish are still counted in poor visibility, and named as a look-alike group when the model is very
+    sure, but never as a species. So a species' effort leaves those hours out; a group's doesn't."""
+    spec = json.loads((LIVECAMS / "tracker" / "species.json").read_text(encoding="utf-8"))
+    groups = {s["group"] for s in spec["species"] if s.get("group")}
+    return animal.removesuffix(" (school)") in groups | {"small fish", "fish (unidentified)"}
+
+
 def fit(table, animal):
     import statsmodels.api as sm
 
     usable = [p for p in PREDICTORS if p in table and table[p].notna().mean() > 0.8 and table[p].std() > 0]
     if "oni" in usable and table["oni"].max() - table["oni"].min() < 0.3:
         usable.remove("oni")  # the index barely changed over this data: nothing to learn from it yet
-    data = table.dropna(subset=usable)
+    effort = "daylight" if logged_in_poor_water(animal) else "naming"
+    data = table[table[effort] > 0].dropna(subset=usable)
     X = (data[usable] - data[usable].mean()) / data[usable].std()
     seen = (data[animal] > 0).astype(int)
-    X = sm.add_constant(X.assign(log_effort=np.log(data["daylight"])))
+    X = sm.add_constant(X.assign(log_effort=np.log(data[effort])))
     model = sm.Logit(seen, X).fit(disp=0, maxiter=200)
     ci = model.conf_int()
     rows = []

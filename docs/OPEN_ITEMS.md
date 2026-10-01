@@ -40,6 +40,11 @@ These are built and switch themselves on; they only need time or answers.
 
 ## To watch
 
+- **Water clarity levels (from 2026-09-30):** set on six days, one of them murky. After the next murky days, check the
+  levels against the frames and the turbidity sensor (`SELECT date, clarity, COUNT(*) FROM snapshots ...`), and split
+  review answers by clarity to see whether fair water names species as reliably as good water.
+- **Drifting kelp at the lens** (2026-09-30, 16:00-18:00) came out "octopus" and "market squid" (its gas bladders look
+  like squid). Answering those review pictures "not an animal" teaches the camera classifier and the fixture gallery.
 - **Frames every 2 s and the rewind video (from 2026-09-28):** the first daylight day. Check that the frames
   between snapshots stay within their 15 min/hour of model time and catch real passers-by (`between snapshots`
   lines in `logs/tracker.log`), tune the 30% solidity bar if schools set it off constantly, measure the daytime

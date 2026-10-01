@@ -55,7 +55,7 @@ disk space: ~35 MB a minute, ~2.1 GB an hour.
 
 ```mermaid
 flowchart LR
-    A["Underwater player<br/>(on the wallpaper)"] -->|"a frame every 2 s<br/>(a snapshot every 10 s)"| B{"Too dark?"}
+    A["Underwater player<br/>(on the wallpaper)"] -->|"a frame every 2 s<br/>(a snapshot every 12 s)"| B{"Too dark?"}
     B -->|yes| N["Counted as a night snapshot.<br/>No model runs."]
     B -->|no| V{"Water clear<br/>enough?"}
     V -->|"too murky"| N2["Counted as a murky snapshot.<br/>No model runs."]
@@ -75,24 +75,36 @@ flowchart LR
 
 1. **Frame capture.** The wallpaper copies the current video frame straight from the player (1920×1080,
    without logos or overlays) to `frames/underwater/latest.jpg` every 2 s. No second stream is opened.
-   One frame every ~10 s is a **snapshot**: the statistics (snapshots seen, % of clear-water snapshots,
-   hourly effort) use snapshots only, at the same pace as since tracking began. The four frames in
-   between catch what passes quickly (step 9).
+   One frame every 12 s is a **snapshot**: the statistics (snapshots seen, % of snapshots, hourly
+   effort) use snapshots only, at the same pace as since tracking began. (The old "every 10 s" setting
+   really gave 12 s, as LiveCams checked every 3 s. 2026-09-29 and 30 ran at 10 s by mistake; their
+   extra snapshots were re-marked as frames in between, one snapshot per 12-second slot.) The five
+   frames in between catch what passes quickly (step 9).
 2. **Night skip.** The tracker shrinks the frame to 64×36 and checks brightness, detail and color. At
    night the camera shows only purple-grey noise, and in daylight the water here is green. **Twilight**
    counts as night too: at dawn and dusk the picture turns to grainy grey noise before it goes dark, and
    the model called that noise "octopus" at 99%. Its colour saturation drops to 70–110 (of 255), while
    daylight frames, however dim, are 175+. Night frames are counted but never reach a model.
-3. **Murky water.** Every frame gets a **visibility** score: how much fine detail is left (edges of
-   pilings, fish, growth), which murky water washes out. Clear water here scores 2–3. It's averaged over
-   3 frames so the state doesn't flicker.
-   - **Hazy** (below 1.4): fish and schools are still counted, but no species are named. Only a
-     look-alike group at 95%+ is logged, and nothing goes to the review queue, since a person couldn't
-     judge it either.
-   - **Too murky** (below 0.2): nothing is identified. The frame is logged as murky, like a night frame,
-     and it doesn't count as effort. A murky day then reads "couldn't see", not "no fish".
-   - The cutoffs come from a test (see Validation): as simulated murk increased, naming accuracy fell
-     from 92% to 50% long before detection gave out.
+3. **How far it can see.** Every snapshot is judged the way a diver judges visibility: by the pilings.
+   The camera looks down a row of them, so in murky water the far pair (left) fades into the water
+   first, then the middle one (with the crossbeam), and the nearest one last. The tracker measures how
+   much darker each stands out than the open water between them, as a share of the water's brightness,
+   so dim light at dawn and dusk doesn't count as murk. The median of the last 6 snapshots (about a
+   minute) decides, so a fish passing doesn't flip it. Over 42 daylight hours this tracked the pier's
+   turbidity sensor closely (see [Validation](VALIDATION.md), section 8).
+
+   | Clarity | What the camera sees | Far pilings | What the tracker does |
+   |---|---|---|---|
+   | **Good** | the far pilings stand out | ≥ 0.28 | everything |
+   | **Fair** | the far pilings are faint | ≥ 0.12 | everything: a fish close enough to name looks much as on a clear day |
+   | **Poor** | the far pilings are gone, the middle one shows (green water on 2026-09-29) | middle ≥ 0.10 | counts fish but names them only as a look-alike group at 95%+, never a species (the camera-trained classifier included). Other animals only when they look just like one a person confirmed at that place: that day the lobster's legs came out "octopus", "rays", "bat ray" and "sheep crab". No review pictures, no extra looks between snapshots |
+   | **Very poor** | only the nearest piling | middle < 0.10 | nothing: logged as too murky, like night, and not counted as looking. A murky day then reads "couldn't see", not "no fish" |
+
+   Each snapshot records its clarity and both contrasts (`clarity`, `far_contrast`, `mid_contrast`). The
+   tray icon's tooltip shows the current clarity, and the published results show each day's. The older
+   fine-detail score (`visibility`) is still recorded, and decides instead if the pilings aren't where
+   they should be (the camera was moved); it also drops in dim light and rises with fish in view, which is
+   why it's the fallback. Snapshots from before 2026-09-30 have a clarity estimated from it.
 4. **Motion.** The camera never moves, so the tracker keeps a slowly updated background of the scene,
    covering roughly the last 100 seconds, and marks what changed. Pilings, the rope hanging from the pier
    and the growth on them never move. The live test showed they are the main source of false sightings,
@@ -179,8 +191,8 @@ flowchart LR
    - Once a day, `tracker/publish_results.py` summarizes it per hour and per day into the README's results
      and `results/*.csv`, and pushes them. The statistics start at 2026-09-25 10:01, when the current
      model took over; earlier snapshots stay in the database.
-9. **Between snapshots.** An octopus jetting across the screen takes ~2 s, and snapshots 10 s apart
-   missed one on 2026-09-27. So the four frames between two snapshots are checked too, cheaply first: the
+9. **Between snapshots.** An octopus jetting across the screen takes ~2 s, and snapshots 12 s apart
+   missed one on 2026-09-27. So the five frames between two snapshots are checked too, cheaply first: the
    motion check alone (no model) looks for a **new, solid** moving area, i.e. bigger than a small fish,
    at least 30% of its box changed (a passing animal, not the loose specks of a school), not a fish
    already being followed, not a fixture that sways and not open water. Only then does the frame get the
@@ -232,8 +244,8 @@ start: warm-water visitors and missing regulars should both show up against the 
 - **Encounters** are separate visits: sightings of the same animal less than 30 minutes apart are one
   encounter, the usual camera-trap rule for independent detections. Two encounters can still be the
   same fish coming back.
-- A **snapshot** is one frame every ~10 s. **Snapshots seen** measures presence over time: a garibaldi
-  that stays for a minute is in about 6. Frames between snapshots count toward encounters and MaxN,
+- A **snapshot** is one frame every 12 s. **Snapshots seen** measures presence over time: a garibaldi
+  that stays for a minute is in about 5. Frames between snapshots count toward encounters and MaxN,
   never toward snapshots, so this means the same as when tracking began.
 - Animals that never move (anemones, mussels on the piling) aren't in the species list on purpose.
 
@@ -354,9 +366,9 @@ Measured on the machine this runs on: i7-13700K, Radeon RX 7800 XT, Intel UHD 77
 | Turned off (`--off`) | nothing running | none | 0 |
 
 Since 2026-09-28 (the rows above were measured before):
-- **A frame every 2 s** instead of every 10 s. Measured at night (cams live, tracker skipping dark
+- **A frame every 2 s** instead of one every ~12 s. Measured at night (cams live, tracker skipping dark
   frames), everything together used 0.55% of one core (0.02% of total CPU), up from 0.23% with a frame
-  every 10 s. In daylight the frames in between also cost the tracker a motion check each (no model),
+  every ~12 s. In daylight the frames in between also cost the tracker a motion check each (no model),
   and at most 15 minutes of Intel iGPU time per hour when something new moves.
 - **Video kept for rewinding:** a copy of what the player already downloads, with no decoding or
   re-encoding: ~0.6 MB/s written to disk in daylight, about 26 GB a day, deleted after about two days.

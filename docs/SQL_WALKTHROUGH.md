@@ -28,7 +28,7 @@ For a point-and-click view, [DB Browser for SQLite](https://sqlitebrowser.org/) 
 
 | Table | One row per | Key columns |
 |---|---|---|
-| `snapshots` | frame the tracker analyzed (~every 10 s while the cam streams) | `taken_at`, `date`, `hour`, `dark`, `murky`, `visibility` |
+| `snapshots` | frame the tracker analyzed (one every 12 s while the cam streams, plus frames in between where something passed: `regular = 0`) | `taken_at`, `date`, `hour`, `dark`, `murky`, `clarity` (good, fair, poor, very poor), `far_contrast`, `mid_contrast`, `visibility`, `regular` |
 | `sightings` | animal type in a snapshot | `taken_at`, `common_name`, `is_school`, `count`, `confidence`, `method`, `corrected_name` (from a review answer; `''` = not an animal) |
 | `species` | animal the tracker knows | `common_name`, `scientific_name`, `category`, `look_alike_group` |
 | `conditions` | hour at the pier | `date`, `hour`, `pier_water_temp_c`, `pier_temp_anomaly_c`, `turbidity_ntu`, `tide_predicted_m`, `tide_trend`, `oni` |
@@ -171,7 +171,7 @@ morning was murky. To compare fairly, divide by **effort**: the clear-water snap
 is the step people most often skip.
 
 `WITH` names an intermediate result (a CTE), so a long query reads in steps. `regular = 1` keeps only
-the snapshots (one every ~10 s): since 2026-09-28 the tracker also records frames *between* snapshots
+the snapshots (one every 12 s): since 2026-09-28 the tracker also records frames *between* snapshots
 where something passed quickly (`regular = 0`), and those would count the same fish again.
 
 ```sql

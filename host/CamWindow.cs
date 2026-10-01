@@ -275,6 +275,42 @@ internal sealed class CamWindow : Form
         if (captureDir != null) captureTimer.Start();
     }
 
+    /// <summary>
+    /// How far the tracker can see through the water right now, for the tray tooltip: "clear", "fair",
+    /// "poor: fish counted, not named" or "too murky", from the tracker's latest verdict (live.json). Null
+    /// if this cam has no tracker frames, it's night, or the verdict is stale.
+    /// </summary>
+    public string? WaterClarity
+    {
+        get
+        {
+            if (captureDir == null) return null;
+            if (DateTime.UtcNow - clarityReadAt < TimeSpan.FromSeconds(15)) return clarity;
+            clarityReadAt = DateTime.UtcNow;
+            clarity = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(captureDir, "live.json")));
+                var root = doc.RootElement;
+                if (root.TryGetProperty("clarity", out var c) && c.ValueKind == JsonValueKind.String
+                    && DateTime.TryParse(root.GetProperty("taken_at").GetString(), CultureInfo.InvariantCulture,
+                        DateTimeStyles.None, out var at) && DateTime.Now - at < TimeSpan.FromMinutes(2))
+                    clarity = c.GetString() switch
+                    {
+                        "good" => "clear",
+                        "poor" => "poor: fish counted, not named",
+                        "very poor" => "too murky to see",
+                        var other => other,
+                    };
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+                                           or KeyNotFoundException or InvalidOperationException) { }
+            return clarity;
+        }
+    }
+    private string? clarity;
+    private DateTime clarityReadAt;
+
     /// <summary>When the next piece of video the player downloads will be on screen, or null if unknown.</summary>
     private DateTime? NextPieceOnScreen() =>
         bufferedAheadAt is { } at && DateTime.Now - at < TimeSpan.FromSeconds(10) ? at.AddSeconds(bufferedAhead) : null;

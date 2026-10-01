@@ -29,7 +29,7 @@ Answers land in `community/submissions/` (picture + `submissions.csv`), and in t
 ### Two views
 
 - **Tracker view** (default): the tracker's own latest frame with the boxes exactly in place. It's a
-  slideshow, one snapshot about every 10 s (every ~3 s while it follows a fish), and says so on screen.
+  slideshow, a new frame every 2 s, and says so on screen.
   Hovering over a box holds the picture still so it can be clicked. Only shown on this PC, because the
   footage belongs to Scripps/HDOnTap (`showTrackerFrames` in `livecams.json` turns it on elsewhere, with
   their OK).

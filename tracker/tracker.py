@@ -70,9 +70,9 @@ REVIEWED = {"rejected": DATA / "review" / "rejected", "approved": DATA / "review
 
 POLL_SECONDS = 1
 # LiveCams saves a frame every 2 s. A frame at least this long after the last snapshot is the next
-# snapshot (one every ~10 s, as since tracking began: the statistics use only these). The others are
-# "between" frames.
-REGULAR_SECONDS = 9
+# snapshot: one every 12 s, the pace since tracking began (the statistics use only these). The
+# others are "between" frames. (2026-09-29 and 30 ran at 10 s by mistake; re-marked to 12 s.)
+REGULAR_SECONDS = 11
 # Between frames get a full look when something new and solid moved (at least this share of its
 # area changed: a passing animal, not the loose specks of a school)...
 BETWEEN_MIN_DENSITY = 0.30
@@ -101,14 +101,31 @@ MIN_NAME_PX = 80            # fish smaller than this (longest side, 1080p frame)
 # "Validation"): at 0.85 / 0.90 about 80% of the names logged are right; at 0.6 it was ~64%.
 SPECIES_MIN_PROB = 0.85     # a species name needs this probability...
 GROUP_MIN_PROB = 0.90       # ...a look-alike group this much (summed over its members)...
-# ...and in hazy water, where naming accuracy halves long before counting suffers, no species at all:
+# ...and in poor visibility, where naming accuracy halves long before counting suffers, no species at all:
 SPECIES_MIN_PROB_POOR = float("inf")
 GROUP_MIN_PROB_POOR = 0.95
-# Visibility = fine detail left in the frame (mean |frame - blurred frame| at 240x135). Clear water
-# today reads 2.1-3.1. With simulated murk, naming fell from 92% right to 50% by ~1.1 and detection
-# collapsed below ~0.2 (README, "Validation").
-VISIBILITY_POOR = 1.4
-VISIBILITY_MIN = 0.2
+# How far the camera can see, judged the way a diver would: by how well pilings at different distances
+# stand out from the open water. Columns of a 192x108 grey copy of the frame (rows 30-80, mid-height),
+# located on the long-term background: open water in the middle, the far pair of pilings on the left,
+# the middle piling (with the crossbeam) right of centre. Contrast = how much darker a piling is than
+# the water, as a share of the water's brightness, so dim light doesn't change it. Over 42 daylight
+# hours (2026-09-25 to 30) it tracked the pier's turbidity sensor closely (rank correlation -0.84 for
+# the far pilings). See docs/VALIDATION.md, section 8.
+CLARITY_ROWS = (30, 80)
+CLARITY_WATER, CLARITY_FAR, CLARITY_MID = (100, 128), (32, 70), (134, 160)
+# Far pilings (10th-90th percentile of banked daylight frames) on clear days 0.30-0.44, on ordinary days
+# 0.10-0.35; on 2026-09-29, green and murky, they were gone (-0.03-0.13) and the middle one faint (0.09-0.29).
+FAR_GOOD = 0.28   # good: the far pilings stand out
+FAR_FAIR = 0.12   # fair: they're faint but there; a fish close enough to name looks much as on a clear day
+MID_POOR = 0.10   # poor: the far pilings are gone, the middle one still shows: fish are counted, not named.
+                  # Below it, very poor: only the nearest piling shows; nothing is identified, and the
+                  # time doesn't count as looking
+CLARITY_FRAMES = 6  # the median of the last 6 snapshots (about a minute), so a passing fish doesn't flip it
+# Fine detail left in the frame (mean |frame - blurred frame| at 240x135): recorded for every snapshot,
+# and decides instead if the pilings aren't where they should be (the camera was moved). Cutoffs
+# matched to the same days. It also drops in dim light, so it's the fallback, not the measure.
+DETAIL_LEVELS = ((1.8, "good"), (1.0, "fair"), (0.45, "poor"))
+LANDMARKS_MIN_CONTRAST = 0.15  # in the long-term background (clear water) the middle piling stands out ~0.4
 NEGATIVE_MIN_PROB = 0.50    # a detection this sure to be murk/kelp/piling is dropped
 SCENE_MIN_PROB = 0.70       # a non-fish/big animal must beat every label by this much
 SCENE_SURE_PROB = 0.90      # in a small moving area it must reach this, or show up again soon:
@@ -452,10 +469,34 @@ def review_card(view: Image.Image, frame: Image.Image, box, guesses, when: datet
 
 def visibility(img: Image.Image) -> float:
     """How much fine detail the frame shows: edges of pilings, fish, growth. Murky water washes
-    them out, so this falls as turbidity rises."""
+    them out, so this falls as turbidity rises (but also in dim light, and it rises with fish in view)."""
     g = np.asarray(img.convert("L").resize((240, 135), Image.BOX), np.float32)
     blurred = np.asarray(Image.fromarray(g.astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)), np.float32)
     return float(np.mean(np.abs(g - blurred)))
+
+
+def landmark_contrast(img: Image.Image) -> tuple:
+    """(far, middle): how much darker the far pilings and the middle piling are than the open water,
+    as a share of the water's brightness. Medians over each area, so a fish passing hardly moves them."""
+    g = np.asarray(img.convert("L").resize((192, 108), Image.BOX), np.float32)[CLARITY_ROWS[0]:CLARITY_ROWS[1]]
+    water = float(np.median(g[:, CLARITY_WATER[0]:CLARITY_WATER[1]]))
+    if water < 1:
+        return 0.0, 0.0
+    return tuple((water - float(np.median(g[:, a:b]))) / water for a, b in (CLARITY_FAR, CLARITY_MID))
+
+
+def clarity_level(far: float, mid: float) -> str:
+    """good / fair / poor / very poor, from the landmarks' contrast (see FAR_GOOD...)."""
+    if far >= FAR_GOOD:
+        return "good"
+    if far >= FAR_FAIR:
+        return "fair"
+    return "poor" if mid >= MID_POOR else "very poor"
+
+
+def detail_level(detail: float) -> str:
+    """The same levels from the fine-detail score, when the landmarks can't be used."""
+    return next((level for cut, level in DETAIL_LEVELS if detail >= cut), "very poor")
 
 
 def is_dark(img: Image.Image) -> bool:
@@ -591,6 +632,12 @@ class Background:
             self.median = Image.open(BACKGROUND_IMAGE).convert("L")  # from before a restart
         except OSError:
             pass
+
+    @property
+    def landmarks_ok(self) -> bool:
+        """Are the pilings the water clarity is judged by where they should be? In clear water the
+        middle piling stands out; if the camera was moved it won't. True until there's a background."""
+        return self.median is None or landmark_contrast(self.median)[1] >= LANDMARKS_MIN_CONTRAST
 
     def add(self, img: Image.Image, when: datetime):
         if when - self.last < BACKGROUND_EVERY:
@@ -778,8 +825,8 @@ class Tracker:
         self.background = Background()
         self._gallery = None
         self.fixtures_ignored = 0
-        self.murky = False
-        self.recent_visibility = deque(maxlen=3)
+        self.clarity = None  # good / fair / poor / very poor, as of the last snapshot
+        self.recent_clarity = deque(maxlen=CLARITY_FRAMES)  # (far, middle, detail) of the last snapshots
         self.db = db.connect()
         self.scene_first_seen = {}
         self.last_bank = datetime.min
@@ -800,33 +847,30 @@ class Tracker:
         if is_dark(img):
             self.live = []
             self._write_live(img, when, "dark")
-            self.recent_visibility.clear()  # a new day starts fresh
+            self.recent_clarity.clear()  # a new day starts fresh
+            self.clarity = None
             self.hour["dark"] += 1
             self._save_hour()
             db.record_snapshot(self.db, stamp, True, [])
             return []
 
-        # Water clarity: too murky and nothing is identified (like night); poor and only sure
-        # things are named. Murky frames count as effort lost, not as "no animals".
-        self.recent_visibility.append(visibility(img))
-        clarity = float(np.median(self.recent_visibility))  # last 3 frames, so the state doesn't flicker
-        if clarity < VISIBILITY_MIN:
+        # How far the camera can see. Very poor: nothing is identified (like night), and the time
+        # counts as "couldn't see", not as "no animals". Poor: fish are counted, not named.
+        level, far, mid, detail = self._water_clarity(img, when)
+        water = {"clarity": level, "far_contrast": far, "mid_contrast": mid, "visibility": detail}
+        if level == "very poor":
+            self.live = []
+            self._write_live(img, when, "too murky")
             self.hour["murky"] = self.hour.get("murky", 0) + 1
             self._save_hour()
-            db.record_snapshot(self.db, stamp, False, [], murky=True, visibility=clarity)
-            if not self.murky:
-                log.info("%s: water too murky to identify anything (visibility %.2f)", when.strftime("%H:%M:%S"), clarity)
-            self.murky = True
+            db.record_snapshot(self.db, stamp, False, [], murky=True, **water)
             return []
-        if self.murky:
-            log.info("%s: water clear enough again (visibility %.2f)", when.strftime("%H:%M:%S"), clarity)
-        self.murky = False
-        poor = clarity < VISIBILITY_POOR
+        poor = level == "poor"
 
         started = time.perf_counter()
         if not self.motion.update(img, when):
             self._save_hour()
-            db.record_snapshot(self.db, stamp, False, [], visibility=clarity)
+            db.record_snapshot(self.db, stamp, False, [], **water)
             return []  # still learning what the empty scene looks like
         if not poor:
             self.background.add(img, when)
@@ -840,7 +884,7 @@ class Tracker:
             seen[0] += 1
             seen[1] = max(seen[1], s.count)
         self._save_hour()
-        db.record_snapshot(self.db, stamp, False, sightings, visibility=clarity)
+        db.record_snapshot(self.db, stamp, False, sightings, **water)
         self._bank(img, when, sightings)
         log.info("%s: %s (%.2fs%s%s)", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing",
@@ -848,13 +892,32 @@ class Tracker:
                  f", {self.fixtures_ignored} fixed thing(s) ignored" if self.fixtures_ignored else "")
         return sightings
 
+    def _water_clarity(self, img: Image.Image, when: datetime):
+        """(level, far contrast, middle contrast, detail), each a median over the last few snapshots.
+        Logs when the level changes."""
+        self.recent_clarity.append((*landmark_contrast(img), visibility(img)))
+        far, mid, detail = (float(np.median([c[i] for c in self.recent_clarity])) for i in range(3))
+        level = clarity_level(far, mid) if self.background.landmarks_ok else detail_level(detail)
+        if level != self.clarity:
+            what = {"good": "the far pilings stand out", "fair": "the far pilings are faint",
+                    "poor": "the far pilings are gone: counting fish, not naming them",
+                    "very poor": "only the nearest piling shows: not identifying anything"}[level]
+            log.info("%s: water clarity %s (%s; far %.2f, middle %.2f%s)", when.strftime("%H:%M:%S"), level, what,
+                     far, mid, "" if self.background.landmarks_ok else ", judged by detail: the pilings seem to have moved")
+        self.clarity = level
+        return level, far, mid, detail
+
     def _identify(self, img: Image.Image, when: datetime, poor=False):
-        """poor: the water is hazy. Only very sure names are logged (else the look-alike group or
-        "unidentified"), and nothing goes to the review queue: a person couldn't judge it either."""
+        """poor: poor visibility (the far pilings are gone). Fish are counted, and only named as a
+        look-alike group the model is very sure of, never a species (the camera-trained classifier
+        included). Other animals are logged only when they look just like one a person confirmed at
+        that place: on 2026-09-29 the resident lobster's legs came out "octopus", "rays", "bat ray" and
+        "sheep crab", and empty green water "lobster". Nothing goes to the review queue: a person
+        couldn't judge it either."""
         m = self.models()
         species_cut = SPECIES_MIN_PROB_POOR if poor else SPECIES_MIN_PROB
         group_cut = GROUP_MIN_PROB_POOR if poor else GROUP_MIN_PROB
-        scene_cut = SCENE_SURE_PROB if poor else SCENE_MIN_PROB
+        scene_cut = SCENE_MIN_PROB
         queue = (lambda *a, **k: None) if poor else self._queue_review
         found = defaultdict(lambda: [0, 0.0, None, "zero-shot"])  # name -> [count, best prob, label, method]
 
@@ -912,7 +975,7 @@ class Tracker:
         flat = [b for b in views if structure(square_crop(img, b)) < FLAT_MAX]
         views = [b for b in views if b not in flat]
         record["ignored"] += [{"box": [round(v) for v in b[:4]], "verdict": "open water"} for b in flat]
-        views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION else []
+        views += [full] if self.motion.moving_share() >= SCENE_MIN_MOTION and not poor else []
         whole_frame_animal = None
         for box in views:
             view = img if box == full else square_crop(img, box)
@@ -923,6 +986,8 @@ class Tracker:
             if verdict == "confirmed":
                 log_confirmed(view, box, emb)
                 continue
+            if poor:
+                continue  # the model's own name for a non-fish isn't trusted in poor visibility
             probs = m.probabilities(emb)
             if verdict == "suspect":
                 if not m.labels[int(probs.argmax())]["negative"]:
@@ -994,6 +1059,8 @@ class Tracker:
             camera = m.camera_name(emb)
             if camera and camera[0] == "not an animal":
                 continue  # learned from people's answers: this kind of thing isn't an animal
+            if poor:
+                camera = None  # its answers come from clearer water: no species names in poor visibility
             track = self._follow(box, probs, when)
             if track.looks > 1:
                 probs = track.probs_sum / track.looks  # the visit's average look: steadier than one frame
@@ -1045,19 +1112,17 @@ class Tracker:
         - a full look, like a snapshot, when something new and solid moved: what passes between two
           snapshots (an octopus jetting across takes ~2 s). Its sightings are recorded in a between
           frame (snapshots.regular = 0), so they count as encounters, but not as snapshots;
-        - otherwise, if fish are being followed, another look at them for their visit."""
-        if self.motion.background is None or not self._between_budget_left(when):
+        - otherwise, if fish are being followed, another look at them for their visit.
+        Only in good or fair visibility (as of the last snapshot): in poor water nothing is named anyway."""
+        if self.clarity not in ("good", "fair") or self.motion.background is None or not self._between_budget_left(when):
             return []
         if is_dark(img):
-            return []
-        clarity = visibility(img)
-        if clarity < VISIBILITY_POOR:
             return []
         started = time.perf_counter()
         try:
             self.motion.peek(img)
             if self._something_new(img, when):
-                return self._look_between(img, when, clarity)
+                return self._look_between(img, when, visibility(img))
             if self.tracks:
                 self._follow_between(img, when)
             return []
@@ -1084,14 +1149,14 @@ class Tracker:
             return True
         return False
 
-    def _look_between(self, img: Image.Image, when: datetime, clarity: float):
+    def _look_between(self, img: Image.Image, when: datetime, detail: float):
         self.record, self.live = None, []
         sightings = self._identify(img, when)
         if self.record and (self.record["ignored"] or self.record["named"]):
             (RECENT / f"{when:%H%M%S}.json").write_text(json.dumps(self.record), encoding="utf-8")
         if sightings:
             db.record_snapshot(self.db, when.isoformat(timespec="seconds"), False, sightings,
-                               visibility=clarity, regular=False)
+                               visibility=detail, regular=False, clarity=self.clarity)
             self._bank(img, when, sightings)
         log.info("%s: between snapshots: %s", when.strftime("%H:%M:%S"),
                  ", ".join(f"{s.count} {s.common}" for s in sightings) or "nothing new")
@@ -1213,10 +1278,12 @@ class Tracker:
         return verdict
 
     def _write_live(self, img, when: datetime, status: str):
-        """frames/underwater/live.json: this frame's detections, for the community viewer."""
+        """frames/underwater/live.json: this frame's detections and the water clarity, for the community
+        viewer, LiveCams' tray tooltip and its video recorder (which skips the dark)."""
         try:
             tmp = LIVE.with_suffix(".tmp")
             tmp.write_text(json.dumps({"taken_at": when.isoformat(timespec="seconds"), "status": status,
+                                       "clarity": self.clarity,
                                        "width": img.width, "height": img.height,
                                        "detections": getattr(self, "live", [])}), encoding="utf-8")
             os.replace(tmp, LIVE)
@@ -1339,10 +1406,15 @@ def main():
         try:
             mtime = FRAME.stat().st_mtime
             if mtime != last_mtime:
-                last_mtime = mtime
                 if time.time() - mtime < STALE_SECONDS:  # older = the wallpaper isn't streaming
-                    data = FRAME.read_bytes()  # read at once: LiveCams replaces the file every few seconds
+                    try:
+                        data = FRAME.read_bytes()  # read at once: LiveCams replaces the file every 2 s
+                    except PermissionError:
+                        time.sleep(POLL_SECONDS)  # LiveCams is replacing it right now: try again
+                        continue
+                    last_mtime = mtime
                     tracker.process(Image.open(io.BytesIO(data)).convert("RGB"), datetime.fromtimestamp(mtime))
+                last_mtime = mtime
             tracker.unload_if_idle()
         except FileNotFoundError:
             pass

@@ -112,7 +112,7 @@ Decisions go to `data/review/decisions.csv`, and the pictures move to `data/revi
 | `cams[].extraBottomPx` | Pushes a toolbar under the video off-screen (Surfline: 40) |
 | `cams[].mode` | `alwaysOn` (keep streaming) or `resumeWhenWatched` (follow the player's own pause) |
 | `cams[].freezeDisplayAfterSeconds` | Freeze the on-screen picture after this long, while the stream keeps running |
-| `cams[].captureEverySeconds` / `captureDir` | Save a frame for the tracker this often (2 s; its snapshots stay one every ~10 s) |
+| `cams[].captureEverySeconds` / `captureDir` | Save a frame for the tracker this often (2 s; its snapshots stay one every 12 s) |
 | `cams[].rewind` | Keep the cam's video for rewinding: `dir` (folder, default `video`), `maxGB` (default 50, ~24 h), `minFreeGB` (always leave this much free, default 50), `skipDark` (skip night, default true). Leave out to keep nothing |
 | `watchedIdleSeconds` / `coverThreshold` | What counts as "someone is looking" |
 | `pauseDuringFullscreenApps` | Unload the cams during games and other full-screen apps |

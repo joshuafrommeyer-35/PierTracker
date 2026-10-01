@@ -37,6 +37,7 @@ DB_PATH = LIVECAMS / "data" / "piertracker.db"
 # The statistics start here. Earlier snapshots were named by an older model (BioCLIP 2); they stay in
 # the database but are left out of the published numbers and the models.
 STATS_FROM = "2026-09-25T10:01:00"
+DETAIL_CUTS = (1.8, 1.0, 0.45)  # good / fair / poor from the fine-detail score: the same as tracker.DETAIL_LEVELS
 SANDBOX = LIVECAMS / "sandbox" / "piertracker_sandbox.db"
 
 SCHEMA = """
@@ -54,9 +55,12 @@ CREATE TABLE IF NOT EXISTS snapshots (
     hour      INTEGER NOT NULL,  -- 0-23
     dark       INTEGER NOT NULL,  -- 1 = night frame: counted, but no model ran
     murky      INTEGER NOT NULL DEFAULT 0,  -- 1 = water too murky to identify anything: no model ran
-    visibility REAL,              -- how much detail the frame shows (higher = clearer water)
-    regular    INTEGER NOT NULL DEFAULT 1   -- 1 = a snapshot (one every ~10 s); 0 = a frame in between
-                                            -- where something new passed (recorded only with sightings)
+    visibility REAL,              -- how much fine detail the frame shows (higher = clearer water, or more fish)
+    regular    INTEGER NOT NULL DEFAULT 1,  -- 1 = a snapshot (one every ~12 s); 0 = a frame in between
+                                            -- where something new passed
+    clarity    TEXT,              -- how far the camera could see: good | fair | poor | very poor (NULL = dark)
+    far_contrast REAL,            -- how much the far pilings stood out from the water (0 = not at all)
+    mid_contrast REAL             -- the same for the middle piling
 );
 
 CREATE TABLE IF NOT EXISTS sightings (
@@ -117,9 +121,15 @@ def connect(path: Path = None) -> sqlite3.Connection:
 def migrate(con: sqlite3.Connection):
     """Columns added after a database was first made."""
     for table, column in (("sightings", "corrected_name TEXT"), ("reviews", "reviewer TEXT"),
-                          ("snapshots", "regular INTEGER NOT NULL DEFAULT 1")):
+                          ("snapshots", "regular INTEGER NOT NULL DEFAULT 1"), ("snapshots", "clarity TEXT"),
+                          ("snapshots", "far_contrast REAL"), ("snapshots", "mid_contrast REAL")):
         if column.split()[0] not in [c[1] for c in con.execute(f"PRAGMA table_info({table})")]:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
+    # Snapshots from before clarity was judged by the pilings (2026-09-30): estimated from their
+    # fine-detail score, with the cutoffs the tracker falls back on (tracker.DETAIL_LEVELS).
+    con.execute("UPDATE snapshots SET clarity = CASE WHEN visibility >= ? THEN 'good' WHEN visibility >= ? THEN 'fair' "
+                "WHEN visibility >= ? THEN 'poor' ELSE 'very poor' END "
+                "WHERE clarity IS NULL AND dark = 0 AND visibility IS NOT NULL", DETAIL_CUTS)
     con.commit()
 
 
@@ -152,14 +162,15 @@ def apply_corrections(con: sqlite3.Connection, corrections: Path = None):
 
 
 def record_snapshot(con: sqlite3.Connection, taken_at: str, dark: bool, sightings, murky=False, visibility=None,
-                    regular=True):
+                    regular=True, clarity=None, far_contrast=None, mid_contrast=None):
     """Called by the tracker for every snapshot, and for a frame in between where it found something
     (regular=False)."""
     date, time = taken_at.split("T")
-    con.execute("INSERT OR IGNORE INTO snapshots (taken_at, date, hour, dark, murky, visibility, regular) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (taken_at, date, int(time[:2]), int(dark), int(murky),
-                 None if visibility is None else round(visibility, 3), int(regular)))
+    rounded = lambda v: None if v is None else round(v, 3)
+    con.execute("INSERT OR IGNORE INTO snapshots (taken_at, date, hour, dark, murky, visibility, regular, clarity, "
+                "far_contrast, mid_contrast) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (taken_at, date, int(time[:2]), int(dark), int(murky), rounded(visibility), int(regular), clarity,
+                 rounded(far_contrast), rounded(mid_contrast)))
     con.executemany(
         "INSERT INTO sightings (taken_at, common_name, is_school, count, confidence, method) VALUES (?, ?, ?, ?, ?, ?)",
         [(taken_at, s.common.removesuffix(" (school)"), int(s.common.endswith(" (school)")), s.count,
@@ -207,11 +218,13 @@ def hourly(con: sqlite3.Connection):
     analyzed, dark, murky) and the animal's snapshots and most at once. An hour with no sightings
     gets one row with a blank animal. Schools are named "<animal> (school)".
 
-    Effort and snapshots_seen count snapshots only (one every ~10 s). max_count also looks at the
-    frames in between, so an animal seen only between two snapshots has a row with snapshots_seen 0."""
-    effort = {(d, h): (n, dark, murky) for d, h, n, dark, murky in con.execute(
-        "SELECT date, hour, COUNT(*), SUM(dark), SUM(murky) FROM snapshots WHERE taken_at >= ? AND regular = 1 "
-        "GROUP BY date, hour", (STATS_FROM,))}
+    Effort and snapshots_seen count snapshots only (one every ~12 s). max_count also looks at the
+    frames in between, so an animal seen only between two snapshots has a row with snapshots_seen 0.
+    snapshots_poor: snapshots in poor visibility (fish counted, not named); snapshots_murky: too murky
+    to see anything (not counted as looking)."""
+    effort = {(d, h): (n, dark, murky, poor) for d, h, n, dark, murky, poor in con.execute(
+        "SELECT date, hour, COUNT(*), SUM(dark), SUM(murky), SUM(clarity = 'poor' AND NOT murky) FROM snapshots "
+        "WHERE taken_at >= ? AND regular = 1 GROUP BY date, hour", (STATS_FROM,))}
     seen = {}
     for d, h, name, n, most in con.execute(
             "SELECT p.date, p.hour, COALESCE(g.corrected_name, g.common_name) "
@@ -222,10 +235,11 @@ def hourly(con: sqlite3.Connection):
             (STATS_FROM,)):
         seen.setdefault((d, h), []).append((name, n, most))
     rows = []
-    for (d, h), (n, dark, murky) in sorted(effort.items()):
+    for (d, h), (n, dark, murky, poor) in sorted(effort.items()):
         for name, s, most in sorted(seen.get((d, h), [])) or [("", 0, 0)]:
             rows.append({"date": d, "hour": h, "snapshots_analyzed": n, "snapshots_dark": dark or 0,
-                         "snapshots_murky": murky or 0, "common_name": name, "snapshots_seen": s, "max_count": most})
+                         "snapshots_murky": murky or 0, "snapshots_poor": poor or 0, "common_name": name,
+                         "snapshots_seen": s, "max_count": most})
     return rows
 
 

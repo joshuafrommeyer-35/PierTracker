@@ -38,7 +38,7 @@ CLASSIFIER_REPORT = ROOT / "data" / "ml" / "classifier_report.md"
 README = ROOT / "README.md"
 SPECIES = ROOT / "tracker" / "species.json"
 START, END = "<!-- RESULTS:START -->", "<!-- RESULTS:END -->"
-SNAPSHOT_SECONDS = 10  # one snapshot this often (the frames LiveCams saves in between, every 2 s, aren't snapshots)
+SNAPSHOT_SECONDS = 12  # one snapshot this often (the frames LiveCams saves in between, every 2 s, aren't snapshots)
 CAMERA_CLASSIFIER_MIN = 12  # answers an animal needs before the camera-trained classifier learns it (ml/train_classifier.py)
 # Sightings of the same animal closer together than this are one encounter: the usual camera-trap
 # rule for "independent detections" (results were found stable between 5 and 60 minutes).
@@ -62,7 +62,7 @@ def load_hourly():
         rows = db.hourly(con)
     for row in rows:
         key = (row["date"], row["hour"])
-        effort[key] = (row["snapshots_analyzed"], row["snapshots_dark"], row["snapshots_murky"])
+        effort[key] = (row["snapshots_analyzed"], row["snapshots_dark"], row["snapshots_murky"], row.get("snapshots_poor", 0))
         if row["common_name"]:
             s = species[key + (row["common_name"],)]
             s[0] += row["snapshots_seen"]
@@ -96,6 +96,13 @@ def categories():
     cats.update({s["group"]: s["category"] for s in spec["species"] if s.get("group")})  # look-alike groups
     cats["fish (unidentified)"] = cats["small fish"] = "fish"
     return cats
+
+
+def logged_in_poor_water(name):
+    """In poor visibility fish are still counted and named as look-alike groups, never as species."""
+    spec = json.loads(SPECIES.read_text(encoding="utf-8"))
+    groups = {s["group"] for s in spec["species"] if s.get("group")}
+    return base_name(name) in groups | {"small fish", "fish (unidentified)"}
 
 
 def base_name(name):
@@ -208,11 +215,12 @@ def training_line(counts):
 
 
 def build(effort, species):
-    days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "murky": 0, "species": defaultdict(lambda: [0, 0])})
-    for (d, _), (analyzed, dark, murky) in effort.items():
+    days = defaultdict(lambda: {"analyzed": 0, "dark": 0, "murky": 0, "poor": 0, "species": defaultdict(lambda: [0, 0])})
+    for (d, _), (analyzed, dark, murky, poor) in effort.items():
         days[d]["analyzed"] += analyzed
         days[d]["dark"] += dark
         days[d]["murky"] += murky
+        days[d]["poor"] += poor
     by_hour_of_day = [0] * 24
     for (d, h, name), (seen, most) in species.items():
         s = days[d]["species"][name]
@@ -226,14 +234,14 @@ def write_daily(days, encounters):
     RESULTS.mkdir(exist_ok=True)
     with DAILY_CSV.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "common_name", "encounters",
-                    "snapshots_seen", "max_count"])
+        w.writerow(["date", "snapshots_analyzed", "snapshots_dark", "snapshots_murky", "snapshots_poor", "common_name",
+                    "encounters", "snapshots_seen", "max_count"])
         for d in sorted(days):
             day = days[d]
             rows = sorted(day["species"].items()) or [("", [0, 0])]
             for name, (seen, most) in rows:
                 n = "" if not name or name in NO_ENCOUNTERS else encounters.get((d, name), 0)
-                w.writerow([d, day["analyzed"], day["dark"], day["murky"], name, n, seen, most])
+                w.writerow([d, day["analyzed"], day["dark"], day["murky"], day.get("poor", 0), name, n, seen, most])
 
 
 def render_validation(validation):
@@ -261,7 +269,21 @@ def load_environment():
 DAILY_CONDITIONS_FIELDS = [
     "date", "water_temp_c", "water_temp_normal_c", "water_temp_anomaly_c", "water_temp_min_c", "water_temp_max_c",
     "turbidity_ntu_daytime", "chlorophyll_ug_l", "salinity_psu", "oxygen_mg_l", "ph", "tide_range_m",
-    "air_temp_c", "wind_speed_ms", "el_nino_index_oni", "clear_snapshots", "murky_snapshots", "animal_snapshots"]
+    "air_temp_c", "wind_speed_ms", "el_nino_index_oni", "clear_snapshots", "poor_visibility_snapshots",
+    "murky_snapshots", "visibility", "animal_snapshots"]
+
+
+def visibility_summary(tracked):
+    """(label, hours in poor visibility or worse, daylight hours) for one day of snapshots. The label says
+    what most of the day was like: "clear" (good or fair: fish named), "poor" (fish counted, not named),
+    "too murky" (nothing seen), or "mixed"."""
+    looked = tracked["analyzed"] - tracked["dark"] if tracked else 0
+    if not looked:
+        return "", 0.0, 0.0
+    bad = tracked.get("poor", 0) + tracked["murky"]
+    label = ("too murky" if tracked["murky"] / looked >= 0.5 else "poor" if bad / looked >= 0.5
+             else "mixed" if bad / looked >= 0.1 else "clear")
+    return label, bad * SNAPSHOT_SECONDS / 3600, looked * SNAPSHOT_SECONDS / 3600
 
 
 def daily_conditions(days, env):
@@ -304,8 +326,11 @@ def daily_conditions(days, env):
             "wind_speed_ms": agg(pick("wind_speed_ms"), statistics.mean, 1),
             "el_nino_index_oni": oni[-1] if oni else None,
             "clear_snapshots": tracked["analyzed"] - tracked["dark"] - tracked["murky"] if tracked else 0,
+            "poor_visibility_snapshots": tracked.get("poor", 0) if tracked else 0,
             "murky_snapshots": tracked["murky"] if tracked else 0,
+            "visibility": visibility_summary(tracked)[0],
             "animal_snapshots": sum(seen for seen, _ in tracked["species"].values()) if tracked else 0,
+            "_poor_hours": visibility_summary(tracked)[1], "_daylight_hours": visibility_summary(tracked)[2],
         })
         day += timedelta(days=1)
     return rows
@@ -314,7 +339,7 @@ def daily_conditions(days, env):
 def write_daily_conditions(rows):
     RESULTS.mkdir(exist_ok=True)
     with (RESULTS / "daily_conditions.csv").open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, DAILY_CONDITIONS_FIELDS)
+        w = csv.DictWriter(f, DAILY_CONDITIONS_FIELDS, extrasaction="ignore")  # "_..." keys are for the README only
         w.writeheader()
         w.writerows(rows)
 
@@ -327,6 +352,20 @@ def render_conditions(rows):
     def fmt(v, digits=1, signed=False):
         return "–" if v is None else (f"{v:+.{digits}f}" if signed else f"{v:.{digits}f}")
 
+    def seeing(r, short=False):
+        """How well the camera could see that day."""
+        label, poor, daylight = r.get("visibility", ""), r.get("_poor_hours", 0), r.get("_daylight_hours", 0)
+        if short:
+            return {"": "–", "clear": "clear"}.get(label, f"{label} ({poor:.1f} h poor)")
+        return {"": "",
+                "clear": " Underwater visibility: clear enough to name fish " + (
+                    "all day." if poor < 0.05 else f"(poor for {poor:.1f} of {daylight:.1f} daylight hours)."),
+                "mixed": f" Underwater visibility: poor for {poor:.1f} of {daylight:.1f} daylight hours, when fish "
+                         "were counted but not named.",
+                "poor": f" Underwater visibility: **poor** for {poor:.1f} of {daylight:.1f} daylight hours: fish were "
+                        "counted, not named.",
+                "too murky": " Underwater visibility: **too murky** to see anything for most of the day."}[label]
+
     latest = next((r for r in reversed(rows) if r["water_temp_c"] is not None), rows[-1])
     oni = latest["el_nino_index_oni"]
     enso = ("" if oni is None else f" El Niño index **{oni:+.1f}**" +
@@ -335,7 +374,8 @@ def render_conditions(rows):
              f"**{latest['date']}:** water {fmt(latest['water_temp_c'])} °C at ~5 m, "
              f"**{fmt(latest['water_temp_anomaly_c'], signed=True)} °C** vs. normal for the date. Turbidity "
              f"{fmt(latest['turbidity_ntu_daytime'], 2)} NTU, chlorophyll {fmt(latest['chlorophyll_ug_l'], 2)} µg/L."
-             + enso, "", "<details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>", ""]
+             + enso + seeing(latest), "",
+             "<details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>", ""]
     chart = [r for r in rows if r["water_temp_c"] is not None][-30:]
     if len(chart) >= 2 and all(r["water_temp_normal_c"] is not None for r in chart):
         lo = min(min(r["water_temp_c"], r["water_temp_normal_c"]) for r in chart)
@@ -348,11 +388,11 @@ def render_conditions(rows):
                   "    line [" + ", ".join(str(r["water_temp_normal_c"]) for r in chart) + "]",
                   "```", "",
                   "_Upper line: this year. Lower line: the 2013–2025 normal for each date._", ""]
-    lines += ["| Date | Water °C | vs. normal | Turbidity (NTU) | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |",
-              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    lines += ["| Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |",
+              "|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|"]
     for r in rows[-14:]:
         lines.append(f"| {r['date']} | {fmt(r['water_temp_c'])} | {fmt(r['water_temp_anomaly_c'], signed=True)} | "
-                     f"{fmt(r['turbidity_ntu_daytime'], 2)} | {fmt(r['chlorophyll_ug_l'], 2)} | {fmt(r['salinity_psu'], 2)} | "
+                     f"{fmt(r['turbidity_ntu_daytime'], 2)} | {seeing(r, short=True)} | {fmt(r['chlorophyll_ug_l'], 2)} | {fmt(r['salinity_psu'], 2)} | "
                      f"{fmt(r['oxygen_mg_l'], 2)} | {fmt(r['ph'], 2)} | {fmt(r['tide_range_m'], 2)} | {r['animal_snapshots']:,} |")
     lines += ["", "Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla "
               "tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); "
@@ -396,8 +436,10 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
     cats = categories()
     first, last = min(days), max(days)
     analyzed = sum(d["analyzed"] for d in days.values())
-    daylight = sum(d["analyzed"] - d["dark"] - d["murky"] for d in days.values())  # clear-water daylight
+    daylight = sum(d["analyzed"] - d["dark"] - d["murky"] for d in days.values())  # daylight it could see in
+    poor = sum(d.get("poor", 0) for d in days.values())  # ...of which fish were counted, not named
     murky = sum(d["murky"] for d in days.values())
+    hours = lambda n: f"{n * SNAPSHOT_SECONDS / 3600:,.1f} h"
 
     totals = defaultdict(lambda: {"days": 0, "seen": 0, "max": 0, "first": None, "last": None, "encounters": 0})
     for d in sorted(days):
@@ -425,8 +467,9 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "|---|---|",
         f"| Days tracked | {len(days)} |",
         f"| Snapshots analyzed (one every {SNAPSHOT_SECONDS} s while streaming) | {analyzed:,} |",
-        f"| Clear-water daylight footage analyzed | {daylight * SNAPSHOT_SECONDS / 3600:,.1f} h |",
-        f"| Daylight too murky to identify anything | {murky * SNAPSHOT_SECONDS / 3600:,.1f} h |",
+        f"| Daylight footage analyzed | {hours(daylight)} |",
+        f"| ...of it in poor visibility: fish counted, not named | {hours(poor)} |",
+        f"| Daylight too murky to see anything (not counted) | {hours(murky)} |",
         f"| Animal types seen repeatedly or confirmed | {sum(1 for n in totals if listed(n) and n not in NO_ENCOUNTERS)} |",
         "",
         "### Animals seen",
@@ -439,12 +482,15 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         "  camera-trap rule, so a kelp bass that stays for an hour is one encounter.",
         f"- **Snapshots**: how many snapshots (one every {SNAPSHOT_SECONDS} s) it was in, i.e. how long it was around.",
         "  The frames in between (every 2 s) catch animals that pass quickly: those count as encounters.",
+        "- **Visibility**: the tracker judges how far it can see by how well the pilings stand out. In poor",
+        "  visibility (the far pilings gone) fish are counted but not named, so for a species the **%** is of",
+        "  the snapshots it could have been named in; too murky to see anything doesn't count as looking.",
         "",
         training_line(training_answers()) + " **Checked**: how many of the names a person has checked, and how "
         f"many were right. Listed: animals a person confirmed or seen repeatedly ({LIST_MIN_SNAPSHOTS}+ snapshots or "
         f"{LIST_MIN_ENCOUNTERS}+ encounters). Sightings found wrong by checking the pictures are corrected.",
         "",
-        "| Animal | Type | Encounters | Snapshots | % of clear-water snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |",
+        "| Animal | Type | Encounters | Snapshots | % of snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |",
         "|---|---|---:|---:|---:|---:|---:|---|---|---|",
     ]
     minor = []
@@ -452,7 +498,8 @@ def render(days, by_hour_of_day, validation, confirmed, rejected, conditions, en
         if not listed(name):
             minor.append((name, t))
             continue
-        pct = 100 * t["seen"] / daylight if daylight else 0
+        looked = daylight if logged_in_poor_water(name) else daylight - poor
+        pct = 100 * t["seen"] / looked if looked else 0
         base = base_name(name)
         r, w = validation.get(base, (0, 0))
         checked = "—" if base in ("fish (unidentified)", "small fish") else f"{r - w} of {r} right" if r else "not yet"
