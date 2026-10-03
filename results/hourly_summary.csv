@@ -787,4 +787,149 @@ date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,snapshots_poor,commo
 2026-10-01,19,267,267,0,0,,0,0
 2026-10-01,20,298,298,0,0,,0,0
 2026-10-01,21,300,300,0,0,,0,0
-2026-10-01,22,3,3,0,0,,0,0
+2026-10-01,22,300,300,0,0,,0,0
+2026-10-01,23,300,300,0,0,,0,0
+2026-10-02,0,297,297,0,0,,0,0
+2026-10-02,1,300,300,0,0,,0,0
+2026-10-02,2,300,300,0,0,,0,0
+2026-10-02,3,300,300,0,0,,0,0
+2026-10-02,4,300,300,0,0,,0,0
+2026-10-02,5,300,300,0,0,,0,0
+2026-10-02,6,300,143,0,19,California spiny lobster,3,1
+2026-10-02,6,300,143,0,19,giant sea bass,0,1
+2026-10-02,6,300,143,0,19,small fish (school),3,60
+2026-10-02,7,296,0,0,67,California spiny lobster,6,1
+2026-10-02,7,296,0,0,67,bat ray,1,1
+2026-10-02,7,296,0,0,67,blacksmith,3,4
+2026-10-02,7,296,0,0,67,fish (unidentified),6,2
+2026-10-02,7,296,0,0,67,rays,1,2
+2026-10-02,7,296,0,0,67,rubberlip seaperch,0,1
+2026-10-02,7,296,0,0,67,small fish (school),53,250
+2026-10-02,7,296,0,0,67,"wrasses (senorita, sheephead)",2,1
+2026-10-02,8,297,0,0,94,California spiny lobster,3,1
+2026-10-02,8,297,0,0,94,Pacific sardine,1,3
+2026-10-02,8,297,0,0,94,bat ray,1,1
+2026-10-02,8,297,0,0,94,black sea nettle jellyfish,0,1
+2026-10-02,8,297,0,0,94,blacksmith,17,4
+2026-10-02,8,297,0,0,94,blacksmith (school),0,6
+2026-10-02,8,297,0,0,94,"damselfishes (garibaldi, blacksmith)",6,2
+2026-10-02,8,297,0,0,94,diamond stingray,2,1
+2026-10-02,8,297,0,0,94,fish (unidentified),27,4
+2026-10-02,8,297,0,0,94,fish (unidentified) (school),1,5
+2026-10-02,8,297,0,0,94,jack mackerel,1,1
+2026-10-02,8,297,0,0,94,opaleye,2,1
+2026-10-02,8,297,0,0,94,rays,1,1
+2026-10-02,8,297,0,0,94,rock wrasse,0,1
+2026-10-02,8,297,0,0,94,salema,2,1
+2026-10-02,8,297,0,0,94,small fish (school),81,350
+2026-10-02,8,297,0,0,94,"wrasses (senorita, sheephead)",1,1
+2026-10-02,9,297,0,0,122,California spiny lobster,8,1
+2026-10-02,9,297,0,0,122,bat ray,1,1
+2026-10-02,9,297,0,0,122,blacksmith,5,3
+2026-10-02,9,297,0,0,122,"damselfishes (garibaldi, blacksmith)",3,1
+2026-10-02,9,297,0,0,122,fish (unidentified),20,3
+2026-10-02,9,297,0,0,122,fish (unidentified) (school),1,5
+2026-10-02,9,297,0,0,122,jack mackerel,0,1
+2026-10-02,9,297,0,0,122,mackerels & bonito,1,1
+2026-10-02,9,297,0,0,122,octopus,0,1
+2026-10-02,9,297,0,0,122,rays,1,1
+2026-10-02,9,297,0,0,122,silversides & sardines,1,1
+2026-10-02,9,297,0,0,122,small fish (school),69,250
+2026-10-02,9,297,0,0,122,"wrasses (senorita, sheephead)",0,1
+2026-10-02,10,297,0,0,0,California spiny lobster,9,1
+2026-10-02,10,297,0,0,0,bat ray,0,1
+2026-10-02,10,297,0,0,0,black sea nettle jellyfish,1,1
+2026-10-02,10,297,0,0,0,blacksmith,8,2
+2026-10-02,10,297,0,0,0,blacksmith (school),0,6
+2026-10-02,10,297,0,0,0,diamond stingray,0,1
+2026-10-02,10,297,0,0,0,fish (unidentified),11,2
+2026-10-02,10,297,0,0,0,giant kelpfish,1,1
+2026-10-02,10,297,0,0,0,jack mackerel,0,2
+2026-10-02,10,297,0,0,0,jellyfish,0,1
+2026-10-02,10,297,0,0,0,market squid,0,1
+2026-10-02,10,297,0,0,0,rays,1,1
+2026-10-02,10,297,0,0,0,small fish (school),78,200
+2026-10-02,10,297,0,0,0,"wrasses (senorita, sheephead)",2,1
+2026-10-02,11,297,0,0,0,California spiny lobster,0,1
+2026-10-02,11,297,0,0,0,blacksmith,12,4
+2026-10-02,11,297,0,0,0,blacksmith (school),1,8
+2026-10-02,11,297,0,0,0,diamond stingray,1,1
+2026-10-02,11,297,0,0,0,fish (unidentified),4,3
+2026-10-02,11,297,0,0,0,giant sea bass,1,1
+2026-10-02,11,297,0,0,0,jack mackerel,0,1
+2026-10-02,11,297,0,0,0,market squid,0,1
+2026-10-02,11,297,0,0,0,rays,0,1
+2026-10-02,11,297,0,0,0,salema,0,1
+2026-10-02,11,297,0,0,0,small fish (school),163,350
+2026-10-02,11,297,0,0,0,"wrasses (senorita, sheephead)",1,1
+2026-10-02,12,294,0,0,0,California spiny lobster,3,1
+2026-10-02,12,294,0,0,0,blacksmith,3,2
+2026-10-02,12,294,0,0,0,blacksmith (school),0,6
+2026-10-02,12,294,0,0,0,diamond stingray,0,1
+2026-10-02,12,294,0,0,0,fish (unidentified),4,2
+2026-10-02,12,294,0,0,0,green sea turtle,1,1
+2026-10-02,12,294,0,0,0,kelp bass,6,1
+2026-10-02,12,294,0,0,0,octopus,0,1
+2026-10-02,12,294,0,0,0,rays,1,1
+2026-10-02,12,294,0,0,0,salema,1,1
+2026-10-02,12,294,0,0,0,small fish (school),59,250
+2026-10-02,12,294,0,0,0,yellowtail amberjack,0,1
+2026-10-02,13,294,0,0,0,California spiny lobster,4,1
+2026-10-02,13,294,0,0,0,blacksmith,0,4
+2026-10-02,13,294,0,0,0,diamond stingray,1,1
+2026-10-02,13,294,0,0,0,fish (unidentified),4,2
+2026-10-02,13,294,0,0,0,jacksmelt,0,1
+2026-10-02,13,294,0,0,0,kelp bass,2,1
+2026-10-02,13,294,0,0,0,rays,1,1
+2026-10-02,13,294,0,0,0,salema,0,2
+2026-10-02,13,294,0,0,0,silversides & sardines,0,1
+2026-10-02,13,294,0,0,0,small fish (school),22,500
+2026-10-02,14,222,0,0,0,California spiny lobster,12,1
+2026-10-02,14,222,0,0,0,Pacific barracuda,1,1
+2026-10-02,14,222,0,0,0,Pacific bonito,1,3
+2026-10-02,14,222,0,0,0,Pacific sardine,0,1
+2026-10-02,14,222,0,0,0,black sea nettle jellyfish,1,1
+2026-10-02,14,222,0,0,0,blacksmith,4,4
+2026-10-02,14,222,0,0,0,blacksmith (school),0,5
+2026-10-02,14,222,0,0,0,finescale triggerfish,0,1
+2026-10-02,14,222,0,0,0,fish (unidentified),10,2
+2026-10-02,14,222,0,0,0,giant kelpfish,1,1
+2026-10-02,14,222,0,0,0,jellyfish,0,1
+2026-10-02,14,222,0,0,0,kelp bass,9,1
+2026-10-02,14,222,0,0,0,market squid,0,1
+2026-10-02,14,222,0,0,0,octopus,0,1
+2026-10-02,14,222,0,0,0,rays,1,1
+2026-10-02,14,222,0,0,0,salema,2,1
+2026-10-02,14,222,0,0,0,small fish (school),60,300
+2026-10-02,15,17,0,0,0,giant kelpfish,1,1
+2026-10-02,15,17,0,0,0,small fish (school),3,40
+2026-10-02,16,195,0,0,35,Pacific sardine,3,2
+2026-10-02,16,195,0,0,35,blacksmith,10,3
+2026-10-02,16,195,0,0,35,fish (unidentified),22,4
+2026-10-02,16,195,0,0,35,fish (unidentified) (school),2,9
+2026-10-02,16,195,0,0,35,green sea turtle,0,1
+2026-10-02,16,195,0,0,35,"grunts (salema, sargo)",5,3
+2026-10-02,16,195,0,0,35,"grunts (salema, sargo) (school)",1,5
+2026-10-02,16,195,0,0,35,jack mackerel,0,2
+2026-10-02,16,195,0,0,35,kelp bass,3,1
+2026-10-02,16,195,0,0,35,mackerels & bonito,0,1
+2026-10-02,16,195,0,0,35,octopus,0,1
+2026-10-02,16,195,0,0,35,queenfish,0,1
+2026-10-02,16,195,0,0,35,rock wrasse,1,1
+2026-10-02,16,195,0,0,35,salema,7,4
+2026-10-02,16,195,0,0,35,salema (school),1,5
+2026-10-02,16,195,0,0,35,silversides & sardines,4,2
+2026-10-02,16,195,0,0,35,small fish (school),60,300
+2026-10-02,16,195,0,0,35,surfperches,1,1
+2026-10-02,16,195,0,0,35,topsmelt,1,1
+2026-10-02,16,195,0,0,35,"wrasses (senorita, sheephead)",0,1
+2026-10-02,17,174,0,0,169,California spiny lobster,2,1
+2026-10-02,17,174,0,0,169,"damselfishes (garibaldi, blacksmith)",3,2
+2026-10-02,17,174,0,0,169,fish (unidentified),31,4
+2026-10-02,17,174,0,0,169,fish (unidentified) (school),1,7
+2026-10-02,17,174,0,0,169,"grunts (salema, sargo)",10,3
+2026-10-02,17,174,0,0,169,"grunts (salema, sargo) (school)",1,6
+2026-10-02,17,174,0,0,169,mackerels & bonito,2,2
+2026-10-02,17,174,0,0,169,sea basses,4,1
+2026-10-02,17,174,0,0,169,silversides & sardines,8,2
+2026-10-02,17,174,0,0,169,small fish (school),45,250
