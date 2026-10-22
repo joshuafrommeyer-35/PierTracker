@@ -17,14 +17,14 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-10-20 22:01 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-10-20 18:57:47.**
+_Last updated 2026-10-21 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-10-21 20:41:21.
 
 | | |
 |---|---|
-| Days tracked | 11 |
-| Snapshots analyzed (one every 12 s while streaming) | 41,336 |
-| Daylight footage analyzed | 79.8 h |
-| ...of it in poor visibility: fish counted, not named | 18.4 h |
+| Days tracked | 12 |
+| Snapshots analyzed (one every 12 s while streaming) | 43,767 |
+| Daylight footage analyzed | 85.6 h |
+| ...of it in poor visibility: fish counted, not named | 18.5 h |
 | Daylight too murky to see anything (not counted) | 0.0 h |
 | Animal types seen repeatedly or confirmed | 50 |
 
@@ -46,59 +46,59 @@ Names come from BioCLIP 2.5, a general model of living things. A classifier trai
 
 | Animal | Type | Encounters | Snapshots | % of snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | — | 4,501 | 18.79% | 600 | 11 | 2026-09-25 | 2026-10-20 | — |
-| fish (unidentified) | fish | — | 1,626 | 6.79% | 4 | 11 | 2026-09-25 | 2026-10-20 | — |
-| California spiny lobster | invertebrate | 39 | 1,331 | 7.22% | 1 | 11 | 2026-09-25 | 2026-10-20 | not yet |
-| blacksmith | fish | 36 | 674 | 3.66% | 4 | 10 | 2026-09-25 | 2026-10-20 | 6 of 6 right |
-| kelp bass | fish | 37 | 402 | 2.18% | 2 | 11 | 2026-09-25 | 2026-10-20 | 12 of 12 right |
-| sea basses | fish | 24 | 137 | 0.57% | 1 | 9 | 2026-09-27 | 2026-10-20 | not yet |
-| silversides & sardines | fish | 26 | 131 | 0.55% | 4 | 8 | 2026-09-25 | 2026-10-19 | not yet |
-| salema | fish | 29 | 95 | 0.52% | 4 | 7 | 2026-09-25 | 2026-10-19 | 1 of 1 right |
-| wrasses (senorita, sheephead) | fish | 38 | 65 | 0.27% | 2 | 10 | 2026-09-26 | 2026-10-20 | not yet |
-| rays | shark/ray | 32 | 64 | 0.27% | 2 | 9 | 2026-09-26 | 2026-10-20 | not yet |
-| fish (unidentified) (school) | fish | — | 51 | 0.21% | 12 | 9 | 2026-09-25 | 2026-10-19 | — |
-| blacksmith (school) | fish | 16 | 50 | 0.27% | 9 | 6 | 2026-09-25 | 2026-10-02 | 6 of 6 right |
-| damselfishes (garibaldi, blacksmith) | fish | 23 | 48 | 0.20% | 3 | 10 | 2026-09-25 | 2026-10-20 | not yet |
-| Pacific sardine | fish | 19 | 46 | 0.25% | 3 | 6 | 2026-09-25 | 2026-10-02 | not yet |
-| giant kelpfish | fish | 24 | 43 | 0.23% | 2 | 9 | 2026-09-25 | 2026-10-20 | not yet |
-| bat ray | shark/ray | 17 | 42 | 0.23% | 1 | 9 | 2026-09-25 | 2026-10-20 | not yet |
-| diamond stingray | shark/ray | 30 | 32 | 0.17% | 1 | 9 | 2026-09-27 | 2026-10-20 | not yet |
-| jack mackerel | fish | 21 | 30 | 0.16% | 2 | 8 | 2026-09-26 | 2026-10-19 | not yet |
-| grunts (salema, sargo) | fish | 12 | 29 | 0.12% | 3 | 7 | 2026-09-25 | 2026-10-03 | not yet |
-| rock wrasse | fish | 22 | 25 | 0.14% | 1 | 9 | 2026-09-26 | 2026-10-20 | not yet |
-| barred sand bass | fish | 5 | 21 | 0.11% | 1 | 3 | 2026-09-25 | 2026-10-20 | 1 of 1 right |
-| jacksmelt | fish | 15 | 21 | 0.11% | 2 | 7 | 2026-09-25 | 2026-10-19 | 1 of 1 right |
-| sheep crab | invertebrate | 19 | 20 | 0.11% | 1 | 6 | 2026-09-27 | 2026-10-20 | not yet |
-| octopus | invertebrate | 21 | 20 | 0.11% | 1 | 6 | 2026-09-30 | 2026-10-20 | not yet |
-| garibaldi | fish | 15 | 15 | 0.08% | 1 | 4 | 2026-09-25 | 2026-10-20 | not yet |
-| market squid | invertebrate | 27 | 15 | 0.08% | 1 | 7 | 2026-09-28 | 2026-10-20 | not yet |
-| opaleye | fish | 12 | 12 | 0.07% | 1 | 7 | 2026-09-25 | 2026-10-20 | not yet |
-| black sea nettle jellyfish | invertebrate | 22 | 12 | 0.07% | 1 | 7 | 2026-09-26 | 2026-10-20 | not yet |
-| mackerels & bonito | fish | 9 | 11 | 0.05% | 2 | 5 | 2026-09-25 | 2026-10-02 | not yet |
-| finescale triggerfish | fish | 14 | 11 | 0.06% | 1 | 6 | 2026-09-25 | 2026-10-20 | not yet |
-| yellowtail amberjack | fish | 13 | 11 | 0.06% | 1 | 6 | 2026-09-26 | 2026-10-19 | not yet |
+| small fish (school) | fish | — | 4,822 | 18.77% | 600 | 12 | 2026-09-25 | 2026-10-21 | — |
+| fish (unidentified) | fish | — | 1,662 | 6.47% | 4 | 12 | 2026-09-25 | 2026-10-21 | — |
+| California spiny lobster | invertebrate | 43 | 1,426 | 7.08% | 1 | 12 | 2026-09-25 | 2026-10-21 | not yet |
+| blacksmith | fish | 40 | 747 | 3.71% | 4 | 11 | 2026-09-25 | 2026-10-21 | 6 of 6 right |
+| kelp bass | fish | 40 | 455 | 2.26% | 3 | 12 | 2026-09-25 | 2026-10-21 | 12 of 12 right |
+| sea basses | fish | 24 | 137 | 0.53% | 1 | 9 | 2026-09-27 | 2026-10-20 | not yet |
+| silversides & sardines | fish | 26 | 131 | 0.51% | 4 | 8 | 2026-09-25 | 2026-10-19 | not yet |
+| salema | fish | 32 | 95 | 0.47% | 4 | 8 | 2026-09-25 | 2026-10-21 | 1 of 1 right |
+| wrasses (senorita, sheephead) | fish | 41 | 70 | 0.27% | 2 | 11 | 2026-09-26 | 2026-10-21 | not yet |
+| rays | shark/ray | 36 | 68 | 0.26% | 2 | 10 | 2026-09-26 | 2026-10-21 | not yet |
+| blacksmith (school) | fish | 18 | 53 | 0.26% | 9 | 7 | 2026-09-25 | 2026-10-21 | 6 of 6 right |
+| damselfishes (garibaldi, blacksmith) | fish | 25 | 51 | 0.20% | 3 | 11 | 2026-09-25 | 2026-10-21 | not yet |
+| fish (unidentified) (school) | fish | — | 51 | 0.20% | 12 | 9 | 2026-09-25 | 2026-10-19 | — |
+| diamond stingray | shark/ray | 34 | 50 | 0.25% | 1 | 10 | 2026-09-27 | 2026-10-21 | not yet |
+| Pacific sardine | fish | 19 | 46 | 0.23% | 3 | 6 | 2026-09-25 | 2026-10-02 | not yet |
+| giant kelpfish | fish | 26 | 44 | 0.22% | 2 | 10 | 2026-09-25 | 2026-10-21 | not yet |
+| bat ray | shark/ray | 20 | 44 | 0.22% | 1 | 10 | 2026-09-25 | 2026-10-21 | not yet |
+| rock wrasse | fish | 25 | 32 | 0.16% | 2 | 10 | 2026-09-26 | 2026-10-21 | not yet |
+| jack mackerel | fish | 23 | 31 | 0.15% | 2 | 9 | 2026-09-26 | 2026-10-21 | not yet |
+| grunts (salema, sargo) | fish | 12 | 29 | 0.11% | 3 | 7 | 2026-09-25 | 2026-10-03 | not yet |
+| octopus | invertebrate | 23 | 22 | 0.11% | 1 | 7 | 2026-09-30 | 2026-10-21 | not yet |
+| barred sand bass | fish | 5 | 21 | 0.10% | 1 | 3 | 2026-09-25 | 2026-10-20 | 1 of 1 right |
+| jacksmelt | fish | 15 | 21 | 0.10% | 2 | 7 | 2026-09-25 | 2026-10-19 | 1 of 1 right |
+| sheep crab | invertebrate | 19 | 20 | 0.10% | 1 | 6 | 2026-09-27 | 2026-10-20 | not yet |
+| garibaldi | fish | 16 | 18 | 0.09% | 1 | 5 | 2026-09-25 | 2026-10-21 | not yet |
+| market squid | invertebrate | 28 | 15 | 0.07% | 1 | 8 | 2026-09-28 | 2026-10-21 | not yet |
+| mackerels & bonito | fish | 10 | 12 | 0.05% | 2 | 6 | 2026-09-25 | 2026-10-21 | not yet |
+| opaleye | fish | 12 | 12 | 0.06% | 1 | 7 | 2026-09-25 | 2026-10-20 | not yet |
+| black sea nettle jellyfish | invertebrate | 22 | 12 | 0.06% | 1 | 7 | 2026-09-26 | 2026-10-20 | not yet |
+| finescale triggerfish | fish | 17 | 11 | 0.05% | 1 | 7 | 2026-09-25 | 2026-10-21 | not yet |
+| yellowtail amberjack | fish | 13 | 11 | 0.05% | 1 | 6 | 2026-09-26 | 2026-10-19 | not yet |
 | jellyfish | invertebrate | 18 | 10 | 0.04% | 1 | 8 | 2026-09-28 | 2026-10-20 | not yet |
+| Pacific barracuda | fish | 12 | 9 | 0.04% | 1 | 7 | 2026-09-25 | 2026-10-21 | not yet |
 | green sea turtle | reptile | 10 | 8 | 0.04% | 1 | 5 | 2026-09-30 | 2026-10-20 | not yet |
-| Pacific barracuda | fish | 10 | 7 | 0.04% | 1 | 6 | 2026-09-25 | 2026-10-20 | not yet |
-| surfperches | fish | 6 | 6 | 0.03% | 2 | 5 | 2026-09-28 | 2026-10-20 | not yet |
-| topsmelt | fish | 5 | 5 | 0.03% | 1 | 5 | 2026-09-25 | 2026-10-02 | not yet |
-| senorita | fish | 11 | 5 | 0.03% | 1 | 5 | 2026-09-28 | 2026-10-20 | not yet |
-| leopard shark | shark/ray | 9 | 5 | 0.03% | 1 | 5 | 2026-09-28 | 2026-10-20 | not yet |
-| purple-striped jellyfish | invertebrate | 8 | 5 | 0.03% | 1 | 4 | 2026-09-28 | 2026-10-19 | not yet |
+| surfperches | fish | 6 | 6 | 0.02% | 2 | 5 | 2026-09-28 | 2026-10-20 | not yet |
+| leopard shark | shark/ray | 10 | 6 | 0.03% | 1 | 6 | 2026-09-28 | 2026-10-21 | not yet |
+| topsmelt | fish | 5 | 5 | 0.02% | 1 | 5 | 2026-09-25 | 2026-10-02 | not yet |
+| senorita | fish | 12 | 5 | 0.02% | 1 | 6 | 2026-09-28 | 2026-10-21 | not yet |
+| purple-striped jellyfish | invertebrate | 8 | 5 | 0.02% | 1 | 4 | 2026-09-28 | 2026-10-19 | not yet |
 | queenfish | fish | 8 | 4 | 0.02% | 1 | 6 | 2026-09-26 | 2026-10-02 | not yet |
+| bullseye pufferfish | fish | 7 | 4 | 0.02% | 1 | 4 | 2026-09-26 | 2026-10-21 | 0 of 1 right |
 | croakers | fish | 5 | 3 | 0.01% | 1 | 4 | 2026-09-25 | 2026-10-20 | not yet |
-| Pacific bonito | fish | 8 | 3 | 0.02% | 3 | 6 | 2026-09-25 | 2026-10-20 | not yet |
-| salema (school) | fish | 3 | 3 | 0.02% | 5 | 3 | 2026-09-25 | 2026-10-02 | 1 of 1 right |
-| pile perch | fish | 4 | 3 | 0.02% | 1 | 3 | 2026-09-25 | 2026-10-19 | not yet |
-| sargo | fish | 3 | 3 | 0.02% | 1 | 2 | 2026-09-25 | 2026-09-28 | 0 of 1 right |
-| bullseye pufferfish | fish | 5 | 3 | 0.02% | 1 | 3 | 2026-09-26 | 2026-09-30 | 0 of 1 right |
-| shovelnose guitarfish | shark/ray | 5 | 3 | 0.02% | 1 | 3 | 2026-09-27 | 2026-10-19 | not yet |
+| Pacific bonito | fish | 8 | 3 | 0.01% | 3 | 6 | 2026-09-25 | 2026-10-20 | not yet |
+| salema (school) | fish | 3 | 3 | 0.01% | 5 | 3 | 2026-09-25 | 2026-10-02 | 1 of 1 right |
+| pile perch | fish | 4 | 3 | 0.01% | 1 | 3 | 2026-09-25 | 2026-10-19 | not yet |
+| sargo | fish | 3 | 3 | 0.01% | 1 | 2 | 2026-09-25 | 2026-09-28 | 0 of 1 right |
+| shovelnose guitarfish | shark/ray | 5 | 3 | 0.01% | 1 | 3 | 2026-09-27 | 2026-10-19 | not yet |
 | sea chubs (opaleye, halfmoon) | fish | 3 | 3 | 0.01% | 1 | 3 | 2026-09-28 | 2026-09-30 | not yet |
 | halfmoon | fish | 3 | 2 | 0.01% | 1 | 3 | 2026-09-25 | 2026-10-20 | not yet |
 | sharks | shark/ray | 3 | 2 | 0.01% | 1 | 3 | 2026-09-27 | 2026-10-20 | not yet |
 | zebra-perch sea chub | fish | 3 | 2 | 0.01% | 1 | 2 | 2026-09-28 | 2026-10-20 | not yet |
 | giant sea bass | fish | 6 | 2 | 0.01% | 1 | 5 | 2026-09-30 | 2026-10-19 | not yet |
-| banded guitarfish | shark/ray | 5 | 1 | 0.01% | 1 | 3 | 2026-09-30 | 2026-10-19 | not yet |
+| banded guitarfish | shark/ray | 5 | 1 | 0.00% | 1 | 3 | 2026-09-30 | 2026-10-19 | not yet |
 | small fish | fish | — | 0 | 0.00% | 1 | 1 | 2026-09-29 | 2026-09-29 | — |
 
 <details><summary>Seen briefly and not yet checked: 19 more names</summary>
@@ -119,11 +119,11 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 | California sea hare | 2 | 1 | 2026-09-30 | 2026-10-01 |
 | round stingray | 2 | 1 | 2026-09-30 | 2026-10-01 |
 | cabezon | 2 | 1 | 2026-10-01 | 2026-10-01 |
+| rubberlip seaperch | 2 | 1 | 2026-10-02 | 2026-10-21 |
 | harbor seal | 1 | 1 | 2026-10-20 | 2026-10-20 |
 | white seaperch | 1 | 0 | 2026-09-30 | 2026-09-30 |
 | black perch | 2 | 0 | 2026-10-01 | 2026-10-20 |
 | California moray eel | 2 | 0 | 2026-10-01 | 2026-10-01 |
-| rubberlip seaperch | 1 | 0 | 2026-10-02 | 2026-10-02 |
 | swimmer or snorkeler | 1 | 0 | 2026-10-03 | 2026-10-03 |
 | California sea lion | 1 | 0 | 2026-10-20 | 2026-10-20 |
 | diving cormorant | 1 | 0 | 2026-10-20 | 2026-10-20 |
@@ -136,9 +136,9 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 
 ```mermaid
 xychart-beta
-    x-axis ["10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20"]
+    x-axis ["10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21"]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 721, 189]
+    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 721, 189, 633]
 ```
 
 #### When animals show up (all days, Pacific time)
@@ -147,7 +147,7 @@ xychart-beta
 xychart-beta
     x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 65, 379, 650, 762, 1522, 1528, 1298, 741, 846, 549, 572, 564, 218, 0, 0, 0, 0, 0]
+    bar [0, 0, 0, 0, 0, 0, 65, 379, 650, 762, 1531, 1759, 1449, 771, 890, 592, 645, 614, 220, 0, 0, 0, 0, 0]
 ```
 
 </details>
@@ -156,24 +156,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-10-20:** water 22.6 °C at ~5 m, **+3.5 °C** vs. normal for the date. Turbidity 0.37 NTU, chlorophyll 0.46 µg/L. El Niño index **+2.2** (El Niño). Underwater visibility: clear enough to name fish (poor for 0.1 of 5.6 daylight hours).
+**2026-10-21:** water 22.5 °C at ~5 m, **+3.5 °C** vs. normal for the date. Turbidity 0.26 NTU, chlorophyll 0.47 µg/L. El Niño index **+2.2** (El Niño). Underwater visibility: clear enough to name fish (poor for 0.1 of 5.8 daylight hours).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["09-25", "09-26", "09-27", "09-28", "09-29", "09-30", "10-01", "10-02", "10-03", "10-04", "10-05", "10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20"]
-    y-axis "°C" 18 --> 24
-    line [22.76, 22.13, 22.53, 22.78, 21.46, 22.15, 22.28, 22.04, 21.49, 21.88, 21.91, 22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55]
-    line [20.12, 20.06, 20.0, 19.94, 19.86, 19.8, 19.74, 19.68, 19.62, 19.57, 19.51, 19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03]
+    x-axis ["09-25", "09-26", "09-27", "09-28", "09-29", "09-30", "10-01", "10-02", "10-03", "10-04", "10-05", "10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21"]
+    y-axis "°C" 17 --> 24
+    line [22.76, 22.13, 22.53, 22.78, 21.46, 22.15, 22.28, 22.04, 21.49, 21.88, 21.91, 22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54]
+    line [20.12, 20.06, 20.0, 19.94, 19.86, 19.8, 19.74, 19.68, 19.62, 19.57, 19.51, 19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-07 | 22.4 | +3.0 | 0.33 | – | 0.45 | 33.45 | 7.29 | 7.97 | 1.68 | 0 |
 | 2026-10-08 | 22.1 | +2.8 | 0.51 | – | 0.57 | 33.43 | 7.22 | 7.96 | 1.61 | 0 |
 | 2026-10-09 | 22.0 | +2.7 | 0.46 | – | 0.62 | 33.43 | 7.25 | 7.96 | 1.66 | 0 |
 | 2026-10-10 | 21.6 | +2.3 | 0.53 | – | 0.69 | 33.41 | 7.21 | 7.96 | 1.78 | 0 |
@@ -186,7 +185,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-10-17 | 22.1 | +3.0 | 0.41 | – | 0.28 | 33.45 | 7.08 | 7.97 | 1.03 | 0 |
 | 2026-10-18 | 22.7 | +3.6 | 0.53 | – | 0.24 | 33.53 | 6.98 | 7.98 | 1.00 | 0 |
 | 2026-10-19 | 22.7 | +3.6 | 0.34 | clear | 0.36 | 33.51 | 7.04 | 7.97 | 1.02 | 721 |
-| 2026-10-20 | 22.6 | +3.5 | 0.37 | clear | 0.46 | 33.50 | 7.09 | 7.97 | 1.03 | 189 |
+| 2026-10-20 | 22.6 | +3.5 | 0.34 | clear | 0.46 | 33.50 | 7.10 | 7.97 | 1.13 | 189 |
+| 2026-10-21 | 22.5 | +3.5 | 0.26 | clear | 0.47 | 33.52 | 7.18 | 7.98 | 1.15 | 633 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
