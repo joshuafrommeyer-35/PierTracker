@@ -1293,3 +1293,32 @@ date,hour,snapshots_analyzed,snapshots_dark,snapshots_murky,snapshots_poor,commo
 2026-10-21,18,300,192,0,7,octopus,1,1
 2026-10-21,19,300,300,0,0,,0,0
 2026-10-21,20,207,207,0,0,,0,0
+2026-10-22,15,108,0,0,0,California spiny lobster,24,1
+2026-10-22,15,108,0,0,0,black sea nettle jellyfish,1,1
+2026-10-22,15,108,0,0,0,diamond stingray,5,1
+2026-10-22,15,108,0,0,0,fish (unidentified),1,1
+2026-10-22,15,108,0,0,0,giant kelpfish,1,1
+2026-10-22,15,108,0,0,0,jellyfish,0,1
+2026-10-22,15,108,0,0,0,kelp bass,1,1
+2026-10-22,15,108,0,0,0,rays,2,1
+2026-10-22,15,108,0,0,0,small fish (school),0,30
+2026-10-22,15,108,0,0,0,yellowtail amberjack,1,1
+2026-10-22,16,296,0,0,3,California spiny lobster,56,1
+2026-10-22,16,296,0,0,3,Pacific bonito,0,1
+2026-10-22,16,296,0,0,3,bat ray,2,1
+2026-10-22,16,296,0,0,3,blacksmith,0,1
+2026-10-22,16,296,0,0,3,diamond stingray,8,1
+2026-10-22,16,296,0,0,3,finescale triggerfish,0,1
+2026-10-22,16,296,0,0,3,fish (unidentified),1,1
+2026-10-22,16,296,0,0,3,garibaldi,2,1
+2026-10-22,16,296,0,0,3,giant sea bass,1,1
+2026-10-22,16,296,0,0,3,kelp bass,17,1
+2026-10-22,16,296,0,0,3,market squid,1,1
+2026-10-22,16,296,0,0,3,octopus,0,1
+2026-10-22,16,296,0,0,3,rays,4,1
+2026-10-22,16,296,0,0,3,small fish (school),8,70
+2026-10-22,17,173,0,0,32,kelp bass,2,1
+2026-10-22,17,173,0,0,32,sea basses,1,1
+2026-10-22,17,173,0,0,32,small fish (school),1,40
+2026-10-22,18,97,0,0,66,fish (unidentified),1,1
+2026-10-22,18,97,0,0,66,small fish (school),2,18
