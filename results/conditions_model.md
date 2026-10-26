@@ -1,3 +1,3 @@
-# What brings animals in? (2026-10-24)
+# What brings animals in? (2026-10-25)
 
 Waiting for data: 14 of the 21 days needed before fitting models.
