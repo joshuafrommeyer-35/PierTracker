@@ -17,7 +17,7 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-10-25 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-10-23 22:09:56.**
+_Last updated 2026-10-26 22:02 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-10-23 22:09:56.**
 
 | | |
 |---|---|
@@ -174,7 +174,6 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-12 | 21.6 | +2.3 | 1.36 | – | 0.62 | 33.37 | 7.21 | 7.97 | 1.79 | 0 |
 | 2026-10-13 | 21.5 | +2.2 | 0.54 | – | 0.60 | 33.38 | 7.18 | 7.98 | 1.66 | 0 |
 | 2026-10-14 | 21.6 | +2.3 | 0.45 | – | 0.58 | 33.40 | 7.21 | 7.98 | 1.51 | 0 |
 | 2026-10-15 | 21.4 | +2.2 | 0.47 | – | 0.59 | 33.39 | 7.19 | 7.97 | 1.31 | 0 |
@@ -188,6 +187,7 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-10-23 | 22.6 | +3.6 | 0.54 | mixed (2.3 h poor) | 0.44 | 33.57 | 7.06 | 7.99 | 1.39 | 217 |
 | 2026-10-24 | 22.6 | +3.7 | 0.41 | – | 0.41 | 33.59 | 7.09 | 7.98 | 1.69 | 0 |
 | 2026-10-25 | 22.7 | +3.9 | 0.32 | – | 0.42 | 33.60 | 7.06 | 7.98 | 1.95 | 0 |
+| 2026-10-26 | – | – | – | – | – | – | – | – | 2.17 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
