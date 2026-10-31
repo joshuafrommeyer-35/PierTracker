@@ -17,7 +17,7 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-10-29 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-10-23 22:09:56.**
+_Last updated 2026-10-30 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-10-23 22:09:56.**
 
 | | |
 |---|---|
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-10-29:** water 23.0 °C at ~5 m, **+4.4 °C** vs. normal for the date. Turbidity 0.26 NTU, chlorophyll 0.58 µg/L. El Niño index **+2.2** (El Niño).
+**2026-10-30:** water 23.2 °C at ~5 m, **+4.6 °C** vs. normal for the date. Turbidity 0.15 NTU, chlorophyll 0.47 µg/L. El Niño index **+2.2** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["09-30", "10-01", "10-02", "10-03", "10-04", "10-05", "10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29"]
+    x-axis ["10-01", "10-02", "10-03", "10-04", "10-05", "10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30"]
     y-axis "°C" 17 --> 25
-    line [22.15, 22.28, 22.04, 21.49, 21.88, 21.91, 22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.04]
-    line [19.8, 19.74, 19.68, 19.62, 19.57, 19.51, 19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63]
+    line [22.28, 22.04, 21.49, 21.88, 21.91, 22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.18]
+    line [19.74, 19.68, 19.62, 19.57, 19.51, 19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-16 | 21.6 | +2.5 | 0.39 | – | 0.43 | 33.40 | 7.15 | 7.97 | 1.15 | 0 |
 | 2026-10-17 | 22.1 | +3.0 | 0.41 | – | 0.28 | 33.45 | 7.08 | 7.97 | 1.03 | 0 |
 | 2026-10-18 | 22.7 | +3.6 | 0.53 | – | 0.24 | 33.53 | 6.98 | 7.98 | 1.00 | 0 |
 | 2026-10-19 | 22.7 | +3.6 | 0.34 | clear | 0.36 | 33.51 | 7.04 | 7.97 | 1.02 | 721 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-10-26 | 23.1 | +4.3 | 0.36 | – | 0.48 | 33.67 | 7.04 | 7.98 | 2.17 | 0 |
 | 2026-10-27 | 23.0 | +4.3 | 0.36 | – | 0.48 | 33.70 | 6.96 | 7.98 | 2.26 | 0 |
 | 2026-10-28 | 23.0 | +4.3 | 0.23 | – | 0.53 | 33.73 | 6.98 | 7.56 | 2.21 | 0 |
-| 2026-10-29 | 23.0 | +4.4 | 0.26 | – | 0.58 | 33.77 | 6.78 | 7.18 | 1.46 | 0 |
+| 2026-10-29 | 23.1 | +4.4 | 0.26 | – | 0.58 | 33.78 | 6.77 | 7.24 | 2.09 | 0 |
+| 2026-10-30 | 23.2 | +4.6 | 0.15 | – | 0.47 | 33.86 | 6.66 | 7.89 | 0.94 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
