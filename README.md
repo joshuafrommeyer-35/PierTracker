@@ -17,12 +17,12 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-11-03 22:01 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-03 14:35:34.**
+_Last updated 2026-11-04 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-04 15:13:45.**
 
 | | |
 |---|---|
-| Days tracked | 15 |
-| Snapshots analyzed (one every 12 s while streaming) | 48,547 |
+| Days tracked | 16 |
+| Snapshots analyzed (one every 12 s while streaming) | 48,557 |
 | Daylight footage analyzed | 97.8 h |
 | ...of it in poor visibility: fish counted, not named | 21.1 h |
 | Daylight too murky to see anything (not counted) | 0.0 h |
@@ -46,12 +46,12 @@ Names come from BioCLIP 2.5, a general model of living things. A classifier trai
 
 | Animal | Type | Encounters | Snapshots | % of snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | — | 5,230 | 17.83% | 600 | 15 | 2026-09-25 | 2026-11-03 | — |
-| fish (unidentified) | fish | — | 1,757 | 5.99% | 4 | 15 | 2026-09-25 | 2026-11-03 | — |
+| small fish (school) | fish | — | 5,232 | 17.83% | 600 | 16 | 2026-09-25 | 2026-11-04 | — |
+| fish (unidentified) | fish | — | 1,757 | 5.99% | 4 | 16 | 2026-09-25 | 2026-11-04 | — |
 | California spiny lobster | invertebrate | 48 | 1,597 | 6.94% | 1 | 15 | 2026-09-25 | 2026-11-03 | not yet |
-| blacksmith | fish | 43 | 774 | 3.37% | 4 | 13 | 2026-09-25 | 2026-11-03 | 6 of 6 right |
+| blacksmith | fish | 43 | 774 | 3.36% | 4 | 13 | 2026-09-25 | 2026-11-03 | 6 of 6 right |
 | kelp bass | fish | 48 | 511 | 2.22% | 3 | 15 | 2026-09-25 | 2026-11-03 | 12 of 12 right |
-| sea basses | fish | 30 | 154 | 0.53% | 1 | 12 | 2026-09-27 | 2026-11-03 | not yet |
+| sea basses | fish | 30 | 154 | 0.52% | 1 | 12 | 2026-09-27 | 2026-11-03 | not yet |
 | silversides & sardines | fish | 27 | 132 | 0.45% | 4 | 9 | 2026-09-25 | 2026-11-03 | not yet |
 | salema | fish | 36 | 99 | 0.43% | 4 | 9 | 2026-09-25 | 2026-11-03 | 1 of 1 right |
 | rays | shark/ray | 45 | 84 | 0.29% | 2 | 13 | 2026-09-26 | 2026-11-03 | not yet |
@@ -137,9 +137,9 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 
 ```mermaid
 xychart-beta
-    x-axis ["10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03"]
+    x-axis ["10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04"]
     y-axis "Animal snapshots"
-    bar [633, 143, 217, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 511]
+    bar [143, 217, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 511, 2]
 ```
 
 #### When animals show up (all days, Pacific time)
@@ -148,7 +148,7 @@ xychart-beta
 xychart-beta
     x-axis "Hour of day" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
     y-axis "Animal snapshots"
-    bar [0, 0, 0, 0, 0, 0, 65, 379, 650, 762, 1806, 1897, 1545, 812, 938, 651, 796, 671, 226, 0, 0, 0, 0, 0]
+    bar [0, 0, 0, 0, 0, 0, 65, 379, 650, 762, 1806, 1897, 1545, 812, 938, 653, 796, 671, 226, 0, 0, 0, 0, 0]
 ```
 
 </details>
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-11-03:** water 24.1 °C at ~5 m, **+5.7 °C** vs. normal for the date. Turbidity 0.27 NTU, chlorophyll 0.32 µg/L. El Niño index **+2.2** (El Niño). Underwater visibility: clear enough to name fish all day.
+**2026-11-04:** water 24.1 °C at ~5 m, **+5.8 °C** vs. normal for the date. Turbidity 0.41 NTU, chlorophyll 0.40 µg/L. El Niño index **+2.2** (El Niño). Underwater visibility: clear enough to name fish all day.
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["10-05", "10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03"]
+    x-axis ["10-06", "10-07", "10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04"]
     y-axis "°C" 17 --> 26
-    line [21.91, 22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1]
-    line [19.51, 19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37]
+    line [22.11, 22.44, 22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11]
+    line [19.45, 19.4, 19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-21 | 22.5 | +3.5 | 0.26 | clear | 0.48 | 33.52 | 7.18 | 7.98 | 1.19 | 633 |
 | 2026-10-22 | 22.6 | +3.7 | 0.36 | mixed (0.3 h poor) | 0.48 | 33.55 | 7.10 | 7.98 | 1.27 | 143 |
 | 2026-10-23 | 22.6 | +3.6 | 0.54 | mixed (2.3 h poor) | 0.44 | 33.57 | 7.06 | 7.99 | 1.39 | 217 |
 | 2026-10-24 | 22.6 | +3.7 | 0.41 | – | 0.41 | 33.59 | 7.09 | 7.98 | 1.69 | 0 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-10-31 | 23.9 | +5.3 | 0.13 | – | 0.29 | 34.08 | 6.67 | 7.91 | 1.66 | 0 |
 | 2026-11-01 | 23.8 | +5.3 | 0.17 | – | 0.32 | 34.10 | 6.70 | 7.98 | 1.48 | 0 |
 | 2026-11-02 | 23.9 | +5.5 | 0.26 | – | 0.30 | 34.16 | 6.72 | 7.99 | 1.36 | 0 |
-| 2026-11-03 | 24.1 | +5.7 | 0.27 | clear | 0.32 | 34.20 | 6.72 | 7.99 | 1.20 | 511 |
+| 2026-11-03 | 24.1 | +5.7 | 0.26 | clear | 0.32 | 34.21 | 6.72 | 7.99 | 1.29 | 511 |
+| 2026-11-04 | 24.1 | +5.8 | 0.41 | clear | 0.40 | 34.23 | 6.82 | 8.00 | 1.40 | 2 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
