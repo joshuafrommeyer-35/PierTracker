@@ -17,14 +17,14 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-11-06 22:01 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-04 15:13:45.**
+_Last updated 2026-11-07 22:00 (Pacific). Tracking since 2026-09-25._ Last frame analyzed 2026-11-07 20:03:20.
 
 | | |
 |---|---|
-| Days tracked | 16 |
-| Snapshots analyzed (one every 12 s while streaming) | 48,557 |
-| Daylight footage analyzed | 97.8 h |
-| ...of it in poor visibility: fish counted, not named | 21.1 h |
+| Days tracked | 17 |
+| Snapshots analyzed (one every 12 s while streaming) | 48,644 |
+| Daylight footage analyzed | 97.9 h |
+| ...of it in poor visibility: fish counted, not named | 21.2 h |
 | Daylight too murky to see anything (not counted) | 0.0 h |
 | Animal types seen repeatedly or confirmed | 50 |
 
@@ -46,8 +46,8 @@ Names come from BioCLIP 2.5, a general model of living things. A classifier trai
 
 | Animal | Type | Encounters | Snapshots | % of snapshots | Most at once (MaxN) | Days seen | First seen | Last seen | Checked |
 |---|---|---:|---:|---:|---:|---:|---|---|---|
-| small fish (school) | fish | — | 5,232 | 17.83% | 600 | 16 | 2026-09-25 | 2026-11-04 | — |
-| fish (unidentified) | fish | — | 1,757 | 5.99% | 4 | 16 | 2026-09-25 | 2026-11-04 | — |
+| small fish (school) | fish | — | 5,232 | 17.82% | 600 | 16 | 2026-09-25 | 2026-11-04 | — |
+| fish (unidentified) | fish | — | 1,757 | 5.98% | 4 | 16 | 2026-09-25 | 2026-11-04 | — |
 | California spiny lobster | invertebrate | 48 | 1,597 | 6.94% | 1 | 15 | 2026-09-25 | 2026-11-03 | not yet |
 | blacksmith | fish | 43 | 774 | 3.36% | 4 | 13 | 2026-09-25 | 2026-11-03 | 6 of 6 right |
 | kelp bass | fish | 48 | 511 | 2.22% | 3 | 15 | 2026-09-25 | 2026-11-03 | 12 of 12 right |
@@ -137,9 +137,9 @@ unverified: many will turn out to be a better-known fish seen at an odd angle.
 
 ```mermaid
 xychart-beta
-    x-axis ["10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04"]
+    x-axis ["10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07"]
     y-axis "Animal snapshots"
-    bar [143, 217, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 511, 2]
+    bar [0, 0, 0, 0, 0, 0, 0, 0, 0, 511, 2, 0, 0, 0]
 ```
 
 #### When animals show up (all days, Pacific time)
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-11-06:** water 24.1 °C at ~5 m, **+5.9 °C** vs. normal for the date. Turbidity 0.54 NTU, chlorophyll 0.43 µg/L. El Niño index **+2.2** (El Niño).
+**2026-11-07:** water 24.0 °C at ~5 m, **+5.8 °C** vs. normal for the date. Turbidity 0.56 NTU, chlorophyll 0.42 µg/L. El Niño index **+2.2** (El Niño). Underwater visibility: **poor** for 0.1 of 0.1 daylight hours: fish were counted, not named.
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["10-08", "10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06"]
+    x-axis ["10-09", "10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07"]
     y-axis "°C" 17 --> 26
-    line [22.15, 22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.13]
-    line [19.36, 19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19]
+    line [22.03, 21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.98]
+    line [19.33, 19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-24 | 22.6 | +3.7 | 0.41 | – | 0.41 | 33.59 | 7.09 | 7.98 | 1.69 | 0 |
 | 2026-10-25 | 22.7 | +3.9 | 0.32 | – | 0.43 | 33.60 | 7.06 | 7.98 | 1.95 | 0 |
 | 2026-10-26 | 23.1 | +4.3 | 0.36 | – | 0.48 | 33.67 | 7.04 | 7.98 | 2.17 | 0 |
 | 2026-10-27 | 23.0 | +4.3 | 0.36 | – | 0.48 | 33.70 | 6.96 | 7.98 | 2.26 | 0 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-11-03 | 24.1 | +5.7 | 0.26 | clear | 0.32 | 34.21 | 6.72 | 7.99 | 1.29 | 511 |
 | 2026-11-04 | 24.1 | +5.8 | 0.41 | clear | 0.41 | 34.24 | 6.82 | 8.00 | 1.40 | 2 |
 | 2026-11-05 | 24.1 | +5.9 | 0.70 | – | 0.42 | 34.24 | 6.77 | 7.99 | 1.47 | 0 |
-| 2026-11-06 | 24.1 | +5.9 | 0.54 | – | 0.43 | 34.25 | 6.77 | 7.99 | 1.69 | 0 |
+| 2026-11-06 | 24.1 | +5.9 | 0.55 | – | 0.43 | 34.25 | 6.78 | 7.99 | 1.69 | 0 |
+| 2026-11-07 | 24.0 | +5.8 | 0.56 | poor (0.1 h poor) | 0.42 | 34.24 | 6.77 | 7.99 | 1.88 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
