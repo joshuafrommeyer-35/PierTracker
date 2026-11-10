@@ -17,7 +17,7 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-11-08 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
+_Last updated 2026-11-09 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
 
 | | |
 |---|---|
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-11-08:** water 23.9 °C at ~5 m, **+5.8 °C** vs. normal for the date. Turbidity 0.41 NTU, chlorophyll 0.40 µg/L. El Niño index **+2.2** (El Niño).
+**2026-11-09:** water 23.9 °C at ~5 m, **+5.9 °C** vs. normal for the date. Turbidity 0.84 NTU, chlorophyll 0.46 µg/L. El Niño index **+2.5** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["10-10", "10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08"]
+    x-axis ["10-11", "10-12", "10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08", "11-09"]
     y-axis "°C" 17 --> 26
-    line [21.58, 21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.93]
-    line [19.31, 19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08]
+    line [21.27, 21.61, 21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.94, 23.93]
+    line [19.29, 19.28, 19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08, 18.02]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-26 | 23.1 | +4.3 | 0.36 | – | 0.48 | 33.67 | 7.04 | 7.98 | 2.17 | 0 |
 | 2026-10-27 | 23.0 | +4.3 | 0.36 | – | 0.48 | 33.70 | 6.96 | 7.98 | 2.26 | 0 |
 | 2026-10-28 | 23.0 | +4.3 | 0.23 | – | 0.53 | 33.73 | 6.98 | 7.56 | 2.21 | 0 |
 | 2026-10-29 | 23.1 | +4.4 | 0.26 | – | 0.58 | 33.78 | 6.77 | 7.24 | 2.09 | 0 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-11-05 | 24.1 | +5.9 | 0.70 | – | 0.42 | 34.24 | 6.77 | 7.99 | 1.47 | 0 |
 | 2026-11-06 | 24.1 | +5.9 | 0.55 | – | 0.43 | 34.25 | 6.78 | 7.99 | 1.69 | 0 |
 | 2026-11-07 | 24.0 | +5.8 | 0.53 | poor (0.1 h poor) | 0.43 | 34.24 | 6.77 | 7.99 | 1.88 | 0 |
-| 2026-11-08 | 23.9 | +5.8 | 0.41 | – | 0.40 | 34.23 | 6.78 | 7.99 | 1.97 | 0 |
+| 2026-11-08 | 23.9 | +5.9 | 0.41 | – | 0.40 | 34.23 | 6.78 | 7.99 | 1.97 | 0 |
+| 2026-11-09 | 23.9 | +5.9 | 0.84 | – | 0.46 | 34.22 | 6.82 | 7.99 | 1.99 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
