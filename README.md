@@ -17,7 +17,7 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-11-11 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
+_Last updated 2026-11-12 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
 
 | | |
 |---|---|
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-11-11:** water 24.0 °C at ~5 m, **+6.1 °C** vs. normal for the date. Turbidity 0.72 NTU, chlorophyll 0.46 µg/L. El Niño index **+2.5** (El Niño).
+**2026-11-12:** water 23.9 °C at ~5 m, **+6.1 °C** vs. normal for the date. Turbidity 0.60 NTU, chlorophyll 0.42 µg/L. El Niño index **+2.5** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["10-13", "10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08", "11-09", "11-10", "11-11"]
+    x-axis ["10-14", "10-15", "10-16", "10-17", "10-18", "10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08", "11-09", "11-10", "11-11", "11-12"]
     y-axis "°C" 16 --> 26
-    line [21.51, 21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.94, 23.92, 23.93, 23.99]
-    line [19.26, 19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08, 18.02, 17.96, 17.9]
+    line [21.55, 21.41, 21.64, 22.11, 22.67, 22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.94, 23.92, 23.93, 23.99, 23.9]
+    line [19.24, 19.21, 19.18, 19.15, 19.11, 19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08, 18.02, 17.96, 17.9, 17.83]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-10-29 | 23.1 | +4.4 | 0.26 | – | 0.58 | 33.78 | 6.77 | 7.24 | 2.09 | 0 |
 | 2026-10-30 | 23.2 | +4.6 | 0.16 | – | 0.47 | 33.87 | 6.66 | 7.89 | 1.89 | 0 |
 | 2026-10-31 | 23.9 | +5.3 | 0.13 | – | 0.29 | 34.08 | 6.67 | 7.91 | 1.66 | 0 |
 | 2026-11-01 | 23.8 | +5.3 | 0.17 | – | 0.32 | 34.10 | 6.70 | 7.98 | 1.48 | 0 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-11-08 | 23.9 | +5.9 | 0.41 | – | 0.40 | 34.23 | 6.78 | 7.99 | 1.97 | 0 |
 | 2026-11-09 | 23.9 | +5.9 | 0.80 | – | 0.47 | 34.22 | 6.81 | 7.99 | 1.99 | 0 |
 | 2026-11-10 | 23.9 | +6.0 | 0.72 | – | 0.50 | 34.21 | 6.81 | 7.98 | 1.93 | 0 |
-| 2026-11-11 | 24.0 | +6.1 | 0.72 | – | 0.46 | 34.22 | 6.84 | 7.98 | 1.66 | 0 |
+| 2026-11-11 | 24.0 | +6.1 | 0.63 | – | 0.46 | 34.22 | 6.84 | 7.98 | 1.82 | 0 |
+| 2026-11-12 | 23.9 | +6.1 | 0.60 | – | 0.42 | 34.22 | 6.74 | 7.98 | 1.35 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
