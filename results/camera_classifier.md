@@ -1,4 +1,4 @@
-# Camera classifier (2026-11-14 22:00)
+# Camera classifier (2026-11-15 22:11)
 
 80 answered pictures with embeddings. An animal is learned once it has 12 answers; ~30 makes it reliable.
 
