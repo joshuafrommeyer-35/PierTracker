@@ -17,7 +17,7 @@ Windows Efficiency mode, models on the otherwise idle Intel GPU, and everything 
 ## Tracking results
 
 <!-- RESULTS:START -->
-_Last updated 2026-11-17 22:00 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
+_Last updated 2026-11-18 22:01 (Pacific). Tracking since 2026-09-25._ ⚠️ **The tracker hasn't analyzed a frame since 2026-11-07 20:03:20.**
 
 | | |
 |---|---|
@@ -157,24 +157,23 @@ Daily numbers: [`results/daily_summary.csv`](results/daily_summary.csv). Learnin
 
 ### Conditions at the pier
 
-**2026-11-17:** water 23.2 °C at ~5 m, **+5.7 °C** vs. normal for the date. Turbidity 3.02 NTU, chlorophyll 0.56 µg/L. El Niño index **+2.5** (El Niño).
+**2026-11-18:** water 23.4 °C at ~5 m, **+5.9 °C** vs. normal for the date. Turbidity 0.67 NTU, chlorophyll 0.40 µg/L. El Niño index **+2.5** (El Niño).
 
 <details><summary>Water temperature chart, and daily conditions for the last 14 days</summary>
 
 ```mermaid
 xychart-beta
     title "Water temperature at the pier vs. normal for the date (°C)"
-    x-axis ["10-19", "10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08", "11-09", "11-10", "11-11", "11-12", "11-13", "11-14", "11-15", "11-16", "11-17"]
+    x-axis ["10-20", "10-21", "10-22", "10-23", "10-24", "10-25", "10-26", "10-27", "10-28", "10-29", "10-30", "10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06", "11-07", "11-08", "11-09", "11-10", "11-11", "11-12", "11-13", "11-14", "11-15", "11-16", "11-17", "11-18"]
     y-axis "°C" 16 --> 26
-    line [22.66, 22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.94, 23.92, 23.93, 23.99, 23.91, 23.75, 23.62, 23.59, 23.49, 23.23]
-    line [19.06, 19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08, 18.02, 17.96, 17.9, 17.83, 17.77, 17.7, 17.63, 17.57, 17.5]
+    line [22.55, 22.54, 22.62, 22.55, 22.58, 22.73, 23.07, 23.01, 23.02, 23.05, 23.22, 23.88, 23.83, 23.88, 24.1, 24.11, 24.13, 24.11, 23.97, 23.94, 23.92, 23.93, 23.99, 23.91, 23.75, 23.62, 23.59, 23.49, 23.24, 23.35]
+    line [19.03, 18.99, 18.94, 18.9, 18.86, 18.82, 18.77, 18.73, 18.68, 18.63, 18.58, 18.54, 18.48, 18.43, 18.37, 18.3, 18.24, 18.19, 18.13, 18.08, 18.02, 17.96, 17.9, 17.83, 17.77, 17.7, 17.63, 17.57, 17.5, 17.44]
 ```
 
 _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 
 | Date | Water °C | vs. normal | Turbidity (NTU) | Camera visibility | Chlorophyll (µg/L) | Salinity | Oxygen (mg/L) | pH | Tide range (m) | Animal snapshots |
 |---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 2026-11-04 | 24.1 | +5.8 | 0.41 | clear | 0.41 | 34.24 | 6.82 | 8.00 | 1.40 | 2 |
 | 2026-11-05 | 24.1 | +5.9 | 0.70 | – | 0.42 | 34.24 | 6.77 | 7.99 | 1.47 | 0 |
 | 2026-11-06 | 24.1 | +5.9 | 0.55 | – | 0.43 | 34.25 | 6.78 | 7.99 | 1.69 | 0 |
 | 2026-11-07 | 24.0 | +5.8 | 0.53 | poor (0.1 h poor) | 0.43 | 34.24 | 6.77 | 7.99 | 1.88 | 0 |
@@ -187,7 +186,8 @@ _Upper line: this year. Lower line: the 2013–2025 normal for each date._
 | 2026-11-14 | 23.6 | +5.9 | 2.81 | – | 0.64 | 34.21 | 6.92 | 7.97 | 1.33 | 0 |
 | 2026-11-15 | 23.6 | +6.0 | 2.65 | – | 0.55 | 34.21 | 7.03 | 7.96 | 1.15 | 0 |
 | 2026-11-16 | 23.5 | +5.9 | 2.00 | – | 0.58 | 34.21 | 6.94 | 7.96 | 1.00 | 0 |
-| 2026-11-17 | 23.2 | +5.7 | 3.02 | – | 0.56 | 34.25 | 6.95 | 7.96 | 0.58 | 0 |
+| 2026-11-17 | 23.2 | +5.7 | 2.35 | – | 0.55 | 34.25 | 6.93 | 7.96 | 0.89 | 0 |
+| 2026-11-18 | 23.4 | +5.9 | 0.67 | – | 0.40 | 34.26 | 6.70 | 7.96 | 0.78 | 0 |
 
 Sources: SCCOOS shore station on the pier (water; quality-controlled readings only), NOAA La Jolla tide gauge, NOAA Oceanic Niño Index. Every day: [`results/daily_conditions.csv`](results/daily_conditions.csv); hourly, to join with the hourly sightings: [`results/environment_hourly.csv`](results/environment_hourly.csv).
 
